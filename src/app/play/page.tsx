@@ -6,7 +6,7 @@ export default function PlayPage() {
       <div>
         <h1 className="text-2xl font-black">별의 끝에서</h1>
         <p className="text-sm text-muted-foreground">
-          멀티버스에서 온 별의 아이와 함께 여행하며, 너의 이야기를 들려줘.
+          기억을 잃은 별의 아이가 되어, 별빛 세계에서 나를 다시 찾아가는 여행.
         </p>
       </div>
       {/* 게임 화면은 본문 폭보다 넓게 */}

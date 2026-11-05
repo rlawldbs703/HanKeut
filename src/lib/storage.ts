@@ -60,3 +60,8 @@ export interface Capsule {
 const CAPSULE_KEY = "hankeut:capsules";
 export const loadCapsules = () => read<Capsule[]>(CAPSULE_KEY, []);
 export const saveCapsule = (c: Capsule) => write(CAPSULE_KEY, [...loadCapsules(), c].slice(-50));
+
+// 별의 끝에서: 여행 중 떠올린 기억(질문·답) 기록 — 편지 생성에 사용
+const JOURNEY_KEY = "hankeut:journey-log";
+export const loadJourneyLog = () => read<{ region: string; question: string; answer: string; reply: string }[]>(JOURNEY_KEY, []);
+export const saveJourneyLog = (log: { region: string; question: string; answer: string; reply: string }[]) => write(JOURNEY_KEY, log.slice(-60));

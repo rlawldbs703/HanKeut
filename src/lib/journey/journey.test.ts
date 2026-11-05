@@ -1,80 +1,69 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { POST as letter } from "@/app/api/journey/letter/route";
 import { POST as reply } from "@/app/api/journey/reply/route";
-import { ALL_QUESTIONS, FIRST_QUESTION, REGIONS } from "./regions";
-import { fallbackLetter } from "./service";
 
 const post = (b: unknown) => new Request("http://x", { method: "POST", body: JSON.stringify(b) });
 const history = [
-  { region: "어린 별의 방", question: "어렸을 때의 나는 어떤 아이였어?", answer: "소심했어", reply: "" },
-  { region: "오늘의 정원", question: "예전과 비교해서 달라진 점이 있어?", answer: "지금은 좀 활발해졌어", reply: "" },
+  { region: "별의 집", question: "어릴 적 가장 오래 머물고 싶었던 곳은?", answer: "할머니 집 다락방", reply: "" },
+  { region: "잊혀진 정원", question: "요즘 나를 웃게 만드는 작은 일은?", answer: "고양이 사진", reply: "" },
 ];
+const req = { regionId: "garden", topic: "지금의 나", question: "q", answer: "고양이 사진 보는 거", turnInSpot: 0, history };
+const llm = (content: string) =>
+  vi.fn().mockResolvedValue(new Response(JSON.stringify({ choices: [{ message: { content } }] })));
 
 afterEach(() => {
   vi.unstubAllEnvs();
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
 });
 
-describe("지역·질문 구성", () => {
-  it("4개 지역 + 마지막 관문, 기획서의 15개 질문이 모두 배치", () => {
-    expect(REGIONS.map((r) => r.id)).toEqual(["childhood", "now", "heart", "dream", "gate"]);
-    expect(ALL_QUESTIONS).toHaveLength(15);
-    expect(ALL_QUESTIONS).toContain("다른 사람을 챙기느라 나를 놓친 적은 없어?");
-    expect(FIRST_QUESTION).toBe("안녕! 먼저, 당신은 누구인가요?");
-  });
-});
-
-describe("AI 미연결", () => {
+describe("LLM 미연결", () => {
   beforeEach(() => {
     vi.stubEnv("TILON_API_BASE_URL", "");
     vi.stubEnv("LLM_API_BASE_URL", "");
   });
 
-  it("반응은 꾸며 낸 공감 없이 짧게, source=demo", async () => {
-    const d = await (await reply(post({ topic: "t", question: "q", answer: "a", history: [] }))).json();
-    expect(d.source).toBe("demo");
-    expect(d.followUp).toBeNull();
+  it("대사를 꾸며 내지 않고 503 + 안내", async () => {
+    const res = await reply(post(req));
+    expect(res.status).toBe(503);
+    expect((await res.json()).error).toContain("연결되지 않았어요");
+    expect((await letter(post({ history }))).status).toBe(503);
   });
 
-  it("기본 편지는 실제 답만 담고 미연결임을 밝힌다", () => {
-    const l = fallbackLetter(history);
-    expect(l.letter).toContain("소심했어");
-    expect(l.letter).toContain("AI가 연결되어 있지 않아서");
-    expect(l.discoveries).toEqual([]);
-  });
-
-  it("빈 기록은 400", async () => {
+  it("잘못된 요청은 400", async () => {
     expect((await letter(post({ history: [] }))).status).toBe(400);
   });
 });
 
-describe("AI 연결 시", () => {
+describe("LLM 연결 시", () => {
   beforeEach(() => {
     vi.stubEnv("TILON_API_BASE_URL", "");
     vi.stubEnv("LLM_API_BASE_URL", "https://llm.example/v1");
     vi.stubEnv("LLM_MODEL", "m");
   });
 
-  it("이전 대화를 프롬프트에 담아 보내고, 결과를 llm 출처로 돌려준다", async () => {
-    const fetchMock = vi.fn().mockResolvedValue(
-      new Response(JSON.stringify({ choices: [{ message: { content: '{"reply":"많이 달라졌네!","followUp":"언제부터 달라졌어?"}' } }] }))
-    );
+  it("이전 기억을 문맥으로 보내고, LLM이 만든 다음 물음을 돌려준다", async () => {
+    const fetchMock = llm('{"reply":"다락방에서처럼 작은 것에서 행복을 찾는구나.","followUp":"그 사진을 볼 때 마음은 어디에 가 있을까?"}');
     vi.stubGlobal("fetch", fetchMock);
-    const d = await (await reply(post({ topic: "지금의 나", question: "q", answer: "지금은 활발해", history }))).json();
-    expect(d).toMatchObject({ source: "llm", reply: "많이 달라졌네!", followUp: "언제부터 달라졌어?" });
-    expect(JSON.parse(fetchMock.mock.calls[0][1].body).messages[1].content).toContain("소심했어");
+    const d = await (await reply(post(req))).json();
+    expect(d).toMatchObject({ source: "llm", followUp: "그 사진을 볼 때 마음은 어디에 가 있을까?" });
+    const sent = JSON.parse(fetchMock.mock.calls[0][1].body).messages;
+    expect(sent[1].content).toContain("할머니 집 다락방");
+    expect(sent[0].content).toContain("나다워질까"); // 지역 힌트 전달
   });
 
-  it("편지: 사실과 발견을 나눠 받는다", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValue(
-        new Response(JSON.stringify({ choices: [{ message: { content: '{"facts":["어릴 때 소심했다"],"discoveries":["용기를 내 온 것처럼 보였어"],"letter":"안녕, 나는 별의 아이야."}' } }] }))
-      )
-    );
+  it("LLM 실패 시 502 + 재시도 안내", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("x", { status: 500 })));
+    const res = await reply(post(req));
+    expect(res.status).toBe(502);
+    expect((await res.json()).error).toContain("다시 시도");
+  });
+
+  it("편지: 사실/발견 분리", async () => {
+    vi.stubGlobal("fetch", llm('{"facts":["할머니 집 다락방을 좋아했다"],"discoveries":["작은 공간을 아끼는 것처럼 보였어"],"letter":"안녕, 별의 아이야."}'));
     const d = await (await letter(post({ history }))).json();
-    expect(d.facts).toEqual(["어릴 때 소심했다"]);
-    expect(d.discoveries).toHaveLength(1);
+    expect(d.facts).toHaveLength(1);
     expect(d.source).toBe("llm");
   });
 });

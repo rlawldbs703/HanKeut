@@ -1,6 +1,6 @@
 "use client";
 
-import { type ReactNode, useEffect, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { type LightPuzzle as Puzzle, createGardenPuzzle, rotateMirror, traceLight } from "@/lib/play/light";
 import { RADIO_MAX, RADIO_MIN, RADIO_TARGET, clarity, garble, isTuned } from "@/lib/play/radio";
@@ -76,13 +76,18 @@ export function LightPuzzle({ onSolved }: { onSolved: () => void }) {
   const [p, setP] = useState<Puzzle>(() => createGardenPuzzle());
   const { path, reached } = traceLight(p);
   const lit = new Set(path.map(([r, c]) => `${r},${c}`));
+  // 부모가 자주 다시 그려져도 완료 타이머가 초기화되지 않도록 최신 콜백을 ref로 보관
+  const solvedRef = useRef(onSolved);
+  useEffect(() => {
+    solvedRef.current = onSolved;
+  });
 
   useEffect(() => {
     if (!reached) return;
     playResolve();
-    const t = setTimeout(onSolved, 1200);
+    const t = setTimeout(() => solvedRef.current(), 1200);
     return () => clearTimeout(t);
-  }, [reached, onSolved]);
+  }, [reached]);
 
   return (
     <Overlay title="✦ 빛의 경로 잇기">

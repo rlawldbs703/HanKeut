@@ -188,3 +188,7 @@
 @media (prefers-reduced-motion: reduce) {
   .anim-mote, .anim-firefly, .anim-sway, .anim-twinkle, .anim-spin-slow, .anim-breathe, .anim-walk, .anim-drift, .anim-shooting { animation: none; }
 }
+@keyframes hop { 0%,100% { transform: translateY(0) scale(1,1); } 30% { transform: translateY(0) scale(1.08,.9); } 60% { transform: translateY(-14px) scale(.95,1.06); } }
+@keyframes run-bob { 0%,100% { transform: translateY(0) rotate(-4deg); } 50% { transform: translateY(-8px) rotate(3deg); } }
+.anim-hop { animation: hop .45s ease-out; transform-origin: bottom; }
+.anim-run { animation: run-bob .3s ease-in-out infinite; transform-origin: bottom; }

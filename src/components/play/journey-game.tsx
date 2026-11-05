@@ -1,79 +1,86 @@
 "use client";
 
-// 《별의 끝에서》 — 별의 아이와 함께 여행하며 나의 이야기를 들려주는 2.5D 탐험
-import { Loader2, Maximize, Send, Volume2, VolumeX } from "lucide-react";
+// 《별의 끝에서》 — 플레이어 = 기억을 잃은 별의 아이. 장소마다 기억을 떠올리고, 관문 미니게임을 풀며 별빛 세계를 여행한다.
+import { Loader2, Maximize, RotateCcw, Send, Volume2, VolumeX } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { FIRST_QUESTION, REGIONS, type Spot, type Theme } from "@/lib/journey/regions";
 import type { Exchange, LetterResult } from "@/lib/journey/types";
+import { saveJourneyLog } from "@/lib/storage";
 import { cn } from "@/lib/utils";
 import type { AiSource } from "@/types";
 import { playChime, playResolve, setMuted, startAmbient, stopAmbient } from "./audio";
-import { Floor, Foreground, Lanterns, MidLayer, Motes, Sky, StarChild, StarField } from "./scene-art";
+import { Constellation, MemoryOrder, Overlay, ShadowField } from "./minigames";
+import { LightPuzzle } from "./puzzles";
+import { Floor, Foreground, Lanterns, MidLayer, Motes, ObjectArt, Sky, StarChild, StarField } from "./scene-art";
 import { TimeCapsule } from "./time-capsule";
 
-type Phase = "title" | "guide" | "explore" | "farewell" | "letterDrop" | "letter" | "capsule";
-interface Ask {
-  question: string;
-  spotId: string | null; // null = 첫 질문
-  qIndex: number;
-  isFollowUp: boolean;
-}
-interface Talk {
-  queue: string[];
-  ask?: Ask;
-  onDone?: () => void;
-}
+type Phase = "title" | "guide" | "explore" | "minigame" | "ending" | "letterDrop" | "letter" | "capsule";
+type Speaker = "whisper" | "me" | "system";
+interface Line { who: Speaker; text: string }
+interface Ask { question: string; spotId: string | null; turn: number }
+interface Talk { queue: Line[]; ask?: Ask; onDone?: () => void }
+interface Body { x: number; lane: number; vx: number; vl: number; flip: number; cam: number }
 
-const SPEED = 280;
-const THEME_STAGE: Record<Theme, "house" | "garden"> = { house: "house", garden: "garden", lake: "garden", hill: "garden", gate: "garden" };
-const THEME_FILTER: Record<Theme, string> = {
+// 움직임: 가속·감속·달리기
+const ACCEL = 1500, FRICTION = 2000, WALK = 230, RUN = 420, LANE_MAX = 0.85;
+const STAGE: Record<Theme, "house" | "garden"> = { house: "house", garden: "garden", plain: "garden", attic: "house", hall: "garden" };
+const FILTER: Record<Theme, string> = {
   house: "none",
   garden: "none",
-  lake: "hue-rotate(-55deg) saturate(1.1)",
-  hill: "hue-rotate(25deg) saturate(1.2) brightness(1.05)",
-  gate: "brightness(0.85) saturate(0.9)",
+  plain: "saturate(0.55) hue-rotate(-30deg) brightness(0.8)",
+  attic: "sepia(0.45) saturate(1.1) brightness(0.9)",
+  hall: "hue-rotate(20deg) saturate(1.25) brightness(1.1)",
 };
+const HOUSE_FRAGMENTS = [
+  { id: "hf1", x: 330, lane: 0.85 },
+  { id: "hf2", x: 860, lane: 0.1 },
+  { id: "hf3", x: 1500, lane: 0.9 },
+];
+const SPEAKER: Record<Speaker, string> = { whisper: "✦ 별빛의 속삭임", me: "나 (별의 아이)", system: "" };
 
 async function post<T>(url: string, body: unknown): Promise<T> {
   const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-  if (!r.ok) throw new Error();
-  return r.json();
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(d.error ?? "잠시 후 다시 시도해 주세요.");
+  return d as T;
 }
 
 export function JourneyGame() {
   const [phase, setPhase] = useState<Phase>("title");
   const [regionIdx, setRegionIdx] = useState(0);
-  const [pos, setPos] = useState({ x: 140, lane: 0.5, facing: 1 as 1 | -1, moving: false });
+  const [view, setView] = useState({ x: 140, lane: 0.5, speed: 0, flip: 1, cam: 0, tilt: 0 });
+  const [hop, setHop] = useState(0);
   const [talk, setTalk] = useState<Talk | null>(null);
   const [typed, setTyped] = useState(0);
   const [answer, setAnswer] = useState("");
   const [waiting, setWaiting] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
   const [history, setHistory] = useState<Exchange[]>([]);
   const [doneSpots, setDoneSpots] = useState<string[]>([]);
+  const [houseFrags, setHouseFrags] = useState<string[]>([]);
   const [source, setSource] = useState<AiSource | null>(null);
   const [letter, setLetter] = useState<(LetterResult & { source: AiSource }) | null>(null);
-  const [farewellStep, setFarewellStep] = useState(0);
+  const [letterError, setLetterError] = useState<string | null>(null);
+  const [showRaw, setShowRaw] = useState(false);
+  const [dissolve, setDissolve] = useState(false);
   const [muted, setMute] = useState(false);
   const [viewW, setViewW] = useState(900);
 
   const keys = useRef(new Set<string>());
-  const posRef = useRef(pos);
+  const body = useRef<Body>({ x: 140, lane: 0.5, vx: 0, vl: 0, flip: 1, cam: 0 });
   const viewRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  const letterReq = useRef(false);
 
   const region = REGIONS[regionIdx];
-  const stage = THEME_STAGE[region.theme];
-  const progress = (regionIdx + doneSpots.filter((id) => region.spots.some((s) => s.id === id)).length / Math.max(1, region.spots.length)) / 4;
-  const hope = Math.min(1, progress);
-  const regionDone = region.spots.every((s) => doneSpots.includes(s.id));
+  const stage = STAGE[region.theme];
+  const hope = Math.min(1, (regionIdx + doneSpots.filter((id) => region.spots.some((s) => s.id === id)).length / 3) / 4);
+  const spotsDone = region.spots.every((s) => doneSpots.includes(s.id));
   const line = talk?.queue[0];
-  const fullyTyped = line ? typed >= line.length : true;
-  const asking = talk && talk.queue.length === 0 && talk.ask;
+  const fullyTyped = line ? typed >= line.text.length : true;
+  const asking = talk && talk.queue.length === 0 ? talk.ask : undefined;
 
-  // 화면 폭
   useEffect(() => {
     const el = viewRef.current;
     if (!el) return;
@@ -82,161 +89,190 @@ export function JourneyGame() {
     return () => ro.disconnect();
   }, []);
 
-  // 글자가 한 자씩 나타나는 효과 (Space로 건너뛰기)
   useEffect(() => {
     if (!line) return;
-    const id = setInterval(() => setTyped((n) => (n >= line.length ? n : n + 1)), 28);
+    const id = setInterval(() => setTyped((n) => (n >= line.text.length ? n : n + 1)), 26);
     return () => clearInterval(id);
   }, [line]);
 
-  // 질문이 나오면 입력창에 포커스
   useEffect(() => {
     if (asking) inputRef.current?.focus();
   }, [asking]);
 
-  // 이동 루프 (대화 중에는 멈춤)
+  // 이동 루프: 가속/감속, 방향 전환(뒤집힘 보간), 카메라 부드럽게 따라가기
   const paused = phase !== "explore" || talk !== null;
+  // 루프는 한 번만 돌고, 바뀌는 값은 live ref로 읽어요 (프레임마다 루프를 다시 만들지 않음)
+  const live = useRef({ paused, width: region.width, house: region.theme === "house", viewW, collect: ((id: string) => void id) as (id: string) => void });
   useEffect(() => {
-    if (paused) {
-      keys.current.clear();
-      return;
-    }
     let raf = 0;
     let last = performance.now();
     const loop = (now: number) => {
-      const dt = Math.min(0.05, (now - last) / 1000);
+      const dt = Math.min(0.033, (now - last) / 1000);
       last = now;
+      const b = body.current;
       const k = keys.current;
-      const dx = (k.has("right") ? 1 : 0) - (k.has("left") ? 1 : 0);
-      const dl = (k.has("up") ? 1 : 0) - (k.has("down") ? 1 : 0);
-      const p = posRef.current;
-      const next = {
-        x: Math.max(60, Math.min(region.width - 60, p.x + dx * SPEED * dt)),
-        lane: Math.max(0, Math.min(1, p.lane + dl * 0.9 * dt)),
-        facing: (dx ? (dx > 0 ? 1 : -1) : p.facing) as 1 | -1,
-        moving: dx !== 0 || dl !== 0,
-      };
-      posRef.current = next;
-      setPos(next);
+      const { paused, viewW, width, house, collect } = live.current;
+      const ix = paused ? 0 : (k.has("right") ? 1 : 0) - (k.has("left") ? 1 : 0);
+      const il = paused ? 0 : (k.has("up") ? 1 : 0) - (k.has("down") ? 1 : 0);
+      const max = k.has("run") ? RUN : WALK;
+      const approach = (v: number, target: number, rate: number) => (v < target ? Math.min(target, v + rate * dt) : Math.max(target, v - rate * dt));
+      b.vx = approach(b.vx, ix * max, ix ? ACCEL : FRICTION);
+      b.vl = approach(b.vl, il * LANE_MAX, il ? 4 : 5);
+      b.x = Math.max(60, Math.min(width - 60, b.x + b.vx * dt));
+      if (b.x <= 60 || b.x >= width - 60) b.vx = 0;
+      b.lane = Math.max(0, Math.min(1, b.lane + b.vl * dt));
+      if (ix) b.flip += (ix - b.flip) * Math.min(1, dt * 14);
+      const target = Math.max(0, Math.min(width - viewW, b.x - viewW * 0.45 + b.vx * 0.25));
+      b.cam += (target - b.cam) * Math.min(1, dt * 4.5);
+      setView({ x: b.x, lane: b.lane, speed: Math.hypot(b.vx, b.vl * 300), flip: b.flip, cam: b.cam, tilt: (b.vx / RUN) * 7 });
+
+      // 별의 집: 걸어서 지나가면 별 조각 수집
+      if (house && !paused) {
+        const f = HOUSE_FRAGMENTS.find((f) => Math.abs(f.x - b.x) < 50 && Math.abs(f.lane - b.lane) < 0.25);
+        if (f) collect(f.id);
+      }
       raf = requestAnimationFrame(loop);
     };
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
-  }, [paused, region.width]);
+  }, []);
 
-  function say(queue: string[], opts: Omit<Talk, "queue"> = {}) {
+  function collectFragment(id: string) {
+    setHouseFrags((fs) => {
+      if (fs.includes(id)) return fs;
+      playChime();
+      const n = fs.length + 1;
+      setTimeout(() => say([{ who: "me", text: n < 3 ? `반짝… 별 조각이야. (${n}/3) 조각에 따뜻한 무언가가 묻어 있어.` : "세 번째 조각! 이제 문을 열 수 있을 것 같아." }]), 0);
+      return [...fs, id];
+    });
+  }
+
+  function say(queue: Line[], opts: Omit<Talk, "queue"> = {}) {
     setTyped(0);
     setTalk({ queue, ...opts });
   }
 
-  /** Space / 클릭: 글자 건너뛰기 → 다음 대사 */
+  useEffect(() => {
+    live.current = { paused, width: region.width, house: region.theme === "house", viewW, collect: collectFragment };
+  });
+
   function advance() {
     if (!talk || !line) return;
-    if (!fullyTyped) {
-      setTyped(line.length);
-      return;
-    }
+    if (!fullyTyped) return setTyped(line.text.length);
     const rest = talk.queue.slice(1);
     setTyped(0);
-    if (rest.length > 0 || talk.ask) setTalk({ ...talk, queue: rest });
+    if (rest.length || talk.ask) setTalk({ ...talk, queue: rest });
     else {
       setTalk(null);
       talk.onDone?.();
     }
   }
 
-  function questionFor(spot: Spot | null, qIndex: number): string | undefined {
-    return spot ? spot.questions[qIndex] : qIndex === 0 ? FIRST_QUESTION : undefined;
-  }
-
-  function askNext(spot: Spot | null, qIndex: number, followUp?: string | null) {
-    if (followUp) return say([], { ask: { question: followUp, spotId: spot?.id ?? null, qIndex, isFollowUp: true } });
-    const q = questionFor(spot, qIndex);
-    if (q) return say([], { ask: { question: q, spotId: spot?.id ?? null, qIndex, isFollowUp: false } });
-    // 이 장소의 질문 끝
-    if (!spot) return say([...REGIONS[0].intro]);
+  function finishSpot(spot: Spot | null) {
+    if (!spot) return say([{ who: "system", text: `— ${REGIONS[0].name} —` }, { who: "me", text: REGIONS[0].intro }]);
     const nowDone = [...doneSpots, spot.id];
     setDoneSpots(nowDone);
     playChime();
-    const allDone = region.spots.every((s) => nowDone.includes(s.id));
-    say([allDone ? "이곳의 이야기는 다 들은 것 같아. 저 끝의 빛을 따라 다음 장소로 가 보자." : "다른 빛도 너를 기다리는 것 같아."]);
+    const all = region.spots.every((s) => nowDone.includes(s.id));
+    say([{ who: "me", text: all ? `이곳의 기억이 조금 돌아왔어. ${region.gate.label}(으)로 가 보자.` : "다른 곳에도 기억이 남아 있는 것 같아." }]);
   }
 
-  async function submitAnswer() {
+  async function submitAnswer(skipAi = false) {
     if (!talk?.ask || waiting) return;
     const ask = talk.ask;
     const text = answer.trim();
-    if (!text) {
-      toast.info("짧게라도 괜찮아. 떠오르는 대로 적어 줘.");
-      return;
+    if (!text) return toast.info("짧게라도 괜찮아. 떠오르는 대로 적어 줘.");
+    const spot = region.spots.find((s) => s.id === ask.spotId) ?? null;
+    const regionName = spot ? region.name : "깨어난 곳";
+    const record = (reply: string) => {
+      const next = [...history, { region: regionName, question: ask.question, answer: text, reply }];
+      setHistory(next);
+      saveJourneyLog(next); // 기록 저장 → 편지 생성에 사용
+      setAnswer("");
+      setAiError(null);
+    };
+    if (skipAi) {
+      record("");
+      setTalk(null);
+      return finishSpot(spot);
     }
     setWaiting(true);
     try {
       const d = await post<{ reply: string; followUp: string | null; source: AiSource }>("/api/journey/reply", {
-        topic: ask.spotId ? region.topic : "자기소개",
+        regionId: spot ? region.id : "intro",
+        topic: spot ? region.topic : "깨어난 별의 아이의 자기소개",
         question: ask.question,
         answer: text,
-        isFollowUp: ask.isFollowUp,
+        turnInSpot: ask.turn,
         history,
       });
       setSource(d.source);
-      setHistory((h) => [...h, { region: ask.spotId ? region.name : "첫 만남", question: ask.question, answer: text, reply: d.reply }]);
-      setAnswer("");
-      const spot = region.spots.find((s) => s.id === ask.spotId) ?? null;
-      const nextIndex = ask.isFollowUp ? ask.qIndex + 1 : d.followUp ? ask.qIndex : ask.qIndex + 1;
-      say([d.reply], { onDone: () => askNext(spot, nextIndex, ask.isFollowUp ? null : d.followUp) });
-    } catch {
-      toast.error("별빛이 잠시 흔들렸어. 다시 보내 줘.");
+      record(d.reply);
+      say([{ who: "whisper", text: d.reply }], {
+        onDone: () =>
+          d.followUp && ask.turn === 0
+            ? say([], { ask: { question: d.followUp, spotId: ask.spotId, turn: 1 } })
+            : finishSpot(spot),
+      });
+    } catch (e) {
+      setAiError((e as Error).message);
     } finally {
       setWaiting(false);
     }
   }
 
+  // 월드 오브젝트
   const objects = [
-    ...region.spots.map((s) => ({ id: s.id, kind: "spot" as const, x: s.x, lane: s.lane, label: s.label, spot: s })),
-    region.theme === "gate"
-      ? { id: "gate", kind: "gate" as const, x: region.width - 320, lane: 0.5, label: "마지막 관문", spot: undefined }
-      : { id: "portal", kind: "portal" as const, x: region.width - 140, lane: 0.5, label: regionDone ? "다음 장소로" : "아직 닫힌 빛", spot: undefined },
+    ...region.spots.filter((s) => !doneSpots.includes(s.id)).map((s) => ({ id: s.id, kind: "spot" as const, x: s.x, lane: s.lane, label: s.label, spot: s })),
+    { id: "gate", kind: "gate" as const, x: region.gate.x, lane: 0.5, label: region.gate.label, spot: undefined },
   ];
-  const near = objects.find((o) => Math.abs(o.x - pos.x) < 85 && Math.abs(o.lane - pos.lane) < 0.45 && !(o.kind === "spot" && doneSpots.includes(o.id)));
+  const near = objects.find((o) => Math.abs(o.x - view.x) < 85 && Math.abs(o.lane - view.lane) < 0.45);
 
   function interact() {
     if (!near) return;
+    setHop((h) => h + 1);
     if (near.kind === "spot" && near.spot) {
-      askNext(near.spot, 0);
-    } else if (near.kind === "portal") {
-      if (!regionDone) return say(["빛을 아직 다 모으지 못했어. 반짝이는 곳에 먼저 가 보자."]);
-      playResolve();
-      const next = regionIdx + 1;
-      setRegionIdx(next);
-      posRef.current = { ...posRef.current, x: 140, lane: 0.5 };
-      setPos(posRef.current);
-      say([`— ${REGIONS[next].name} —`, ...REGIONS[next].intro]);
-    } else if (near.kind === "gate") {
-      startFarewell();
+      return say([{ who: "me", text: `${near.label}… 어딘가 익숙해.` }], { ask: { question: near.spot.seed, spotId: near.spot.id, turn: 0 } });
     }
+    if (!spotsDone) return say([{ who: "me", text: "아직 이곳에서 떠올릴 기억이 남아 있어. 반짝이는 곳을 먼저 둘러보자." }]);
+    if (region.gate.minigame === "fragments" && houseFrags.length < 3)
+      return say([{ who: "me", text: `문에 별 모양 홈이 세 개 있어. 조각이 더 필요해. (${houseFrags.length}/3) 구석구석 걸어 보자.` }]);
+    if (region.gate.minigame === "fragments") return passGate();
+    if (region.gate.minigame === "constellation") fetchLetter();
+    setPhase("minigame");
   }
 
-  // 마지막 관문: 편지를 미리 요청해 두고 작별 연출
-  function startFarewell() {
-    if (!letterReq.current) {
-      letterReq.current = true;
-      post<LetterResult & { source: AiSource }>("/api/journey/letter", { history: history.length ? history : [{ region: "-", question: FIRST_QUESTION, answer: "", reply: "" }] })
-        .then(setLetter)
-        .catch(() => toast.error("편지를 쓰지 못했어. 다시 시도해 줘."));
-    }
-    const quotes = history.filter((h) => h.answer.length > 1).slice(0, 4).map((h) => `"${h.answer.length > 40 ? h.answer.slice(0, 40) + "…" : h.answer}"`);
+  function passGate() {
+    playResolve();
+    setPhase("explore");
+    if (regionIdx === REGIONS.length - 1) return startEnding();
+    const next = regionIdx + 1;
+    setRegionIdx(next);
+    body.current = { ...body.current, x: 140, lane: 0.5, vx: 0, vl: 0, cam: 0 };
+    say([{ who: "system", text: `— ${REGIONS[next].name} —` }, { who: "me", text: REGIONS[next].intro }]);
+  }
+
+  function fetchLetter() {
+    setLetterError(null);
+    post<LetterResult & { source: AiSource }>("/api/journey/letter", { history })
+      .then(setLetter)
+      .catch((e) => setLetterError((e as Error).message));
+  }
+
+  function startEnding() {
+    setPhase("ending");
+    const quotes = history.filter((h) => h.answer.length > 1).slice(0, 4).map((h): Line => ({ who: "me", text: `"${h.answer.length > 40 ? h.answer.slice(0, 40) + "…" : h.answer}"` }));
     say(
       [
-        "여기가 마지막 관문이야. 함께 걸어 줘서 정말 고마웠어.",
-        "사실… 나는 멀티버스의 다른 별에서 왔어. 너의 이야기를 듣고 싶어서 여기까지 함께 여행했어.",
-        ...(quotes.length ? ["네가 들려준 말들이 아직 반짝이고 있어.", ...quotes] : ["조용히 함께 걸은 시간도 나한테는 소중했어."]),
-        "이제 나는 다른 별로 떠나야 해. 내 마음은… 여기에 남겨 둘게.",
+        { who: "system", text: "별자리가 빛나며 전당이 환해진다." },
+        { who: "me", text: "…이 기억들, 전부 내 이야기였구나." },
+        { who: "me", text: "나는 별빛 세계를 헤매던 별의 아이였어. 잃어버린 건 기억이 아니라, 나를 바라보는 시간이었나 봐." },
+        ...(quotes.length ? [{ who: "system" as const, text: "여행에서 떠올린 말들이 별빛이 되어 떠오른다." }, ...quotes] : []),
+        { who: "me", text: "이제 빛으로 돌아갈 시간이야. 그래도… 이번엔 나를 잊지 않을게." },
       ],
       {
         onDone: () => {
-          setPhase("farewell");
-          setFarewellStep(1);
+          setDissolve(true);
           playResolve();
           setTimeout(() => setPhase("letterDrop"), 3200);
         },
@@ -247,14 +283,27 @@ export function JourneyGame() {
   function beginJourney() {
     startAmbient();
     setPhase("explore");
-    say(["…아, 왔구나. 별빛이 너를 데려왔나 봐.", "나는 별의 아이야. 오늘은 너와 함께 걸어 보고 싶어."], { onDone: () => askNext(null, 0) });
+    say([{ who: "system", text: "희미한 별빛 속에서 눈을 떴다." }], { ask: { question: FIRST_QUESTION, spotId: null, turn: 0 } });
   }
-  // 키보드: WASD(방향키) 이동, SPACE 대화 넘기기
+
+  function restart() {
+    setRegionIdx(0);
+    setHistory([]);
+    saveJourneyLog([]);
+    setDoneSpots([]);
+    setHouseFrags([]);
+    setLetter(null);
+    setDissolve(false);
+    body.current = { x: 140, lane: 0.5, vx: 0, vl: 0, flip: 1, cam: 0 };
+    beginJourney();
+  }
+
+  // 키보드: WASD 이동(Shift 달리기), SPACE 대화·건너뛰기
   useEffect(() => {
-    const map: Record<string, string> = { a: "left", A: "left", ArrowLeft: "left", d: "right", D: "right", ArrowRight: "right", w: "up", W: "up", ArrowUp: "up", s: "down", S: "down", ArrowDown: "down" };
+    const map: Record<string, string> = { a: "left", A: "left", ArrowLeft: "left", d: "right", D: "right", ArrowRight: "right", w: "up", W: "up", ArrowUp: "up", s: "down", S: "down", ArrowDown: "down", Shift: "run" };
     const down = (e: KeyboardEvent) => {
-      const typing = (e.target as HTMLElement)?.tagName === "TEXTAREA" || (e.target as HTMLElement)?.tagName === "INPUT";
-      if (typing || phase === "title" || phase === "letter" || phase === "capsule") return;
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === "TEXTAREA" || tag === "INPUT" || ["title", "minigame", "letter", "capsule"].includes(phase)) return;
       if (map[e.key]) {
         e.preventDefault();
         keys.current.add(map[e.key]);
@@ -263,7 +312,7 @@ export function JourneyGame() {
         if (e.repeat) return;
         if (phase === "guide") beginJourney();
         else if (talk && line) advance();
-        else if (!talk) interact();
+        else if (!talk && phase === "explore") interact();
       }
     };
     const up = (e: KeyboardEvent) => map[e.key] && keys.current.delete(map[e.key]);
@@ -274,44 +323,33 @@ export function JourneyGame() {
       window.removeEventListener("keyup", up);
     };
   });
-
   useEffect(() => () => stopAmbient(), []);
 
-
-
-  const cam = Math.max(0, Math.min(region.width - viewW, pos.x - viewW / 2));
-  const laneBottom = (lane: number) => `${10 + lane * 24}%`;
-  const laneScale = (lane: number) => 1 - lane * 0.35;
-  const companionX = pos.x - pos.facing * 70;
+  const laneBottom = (l: number) => `${10 + l * 24}%`;
+  const laneScale = (l: number) => 1 - l * 0.35;
+  const motion = view.speed > 300 ? "anim-run" : view.speed > 25 ? "anim-walk" : "anim-breathe";
+  const memoryCards = REGIONS.slice(0, 4).map((r, i) => ({
+    label: ["어린 시절", "지금의 나", "마음", "미래"][i],
+    text: history.find((h) => h.region === r.name)?.answer ?? "(흐릿한 기억)",
+  }));
   const hold = (k: string) => ({
-    onPointerDown: (e: React.PointerEvent) => {
-      e.preventDefault();
-      keys.current.add(k);
-    },
+    onPointerDown: (e: React.PointerEvent) => { e.preventDefault(); keys.current.add(k); },
     onPointerUp: () => keys.current.delete(k),
     onPointerLeave: () => keys.current.delete(k),
   });
 
   return (
     <div className="space-y-3">
-      <div
-        ref={viewRef}
-        data-testid="game"
-        data-phase={phase}
-        data-region={region.id}
-        data-x={Math.round(pos.x)}
-        data-lane={pos.lane.toFixed(2)}
-        className="relative aspect-[16/10] w-full touch-none select-none overflow-hidden rounded-2xl bg-indigo-950 shadow-2xl ring-1 ring-indigo-900/40 sm:aspect-video"
-      >
+      <div ref={viewRef} data-testid="game" data-phase={phase} data-region={region.id} data-x={Math.round(view.x)} data-lane={view.lane.toFixed(2)} data-frags={houseFrags.length}
+        className="relative aspect-[16/10] w-full touch-none select-none overflow-hidden rounded-2xl bg-indigo-950 shadow-2xl ring-1 ring-indigo-900/40 sm:aspect-video">
         {phase !== "title" && <div key={region.id} className="animate-out fade-out fill-mode-forwards pointer-events-none absolute inset-0 z-[35] bg-black duration-1000" />}
 
-        {/* 배경 (지역 테마별 색) */}
-        <div className="absolute inset-0" style={{ filter: THEME_FILTER[region.theme] }}>
+        <div className="absolute inset-0" style={{ filter: FILTER[region.theme] }}>
           <div className="absolute inset-0 transition-[filter] duration-1000" style={{ filter: `brightness(${0.72 + hope * 0.35})` }}>
             <Sky stage={stage} hope={hope} />
           </div>
           <StarField hope={hope} />
-          <div className="absolute inset-0 will-change-transform" style={{ transform: `translateX(${-cam * 0.55}px)` }}>
+          <div className="absolute inset-0 will-change-transform" style={{ transform: `translate3d(${-view.cam * 0.55}px,0,0)` }}>
             <MidLayer stage={stage} width={region.width * 0.55 + viewW} />
             {stage === "house" && <Lanterns width={region.width * 0.55 + viewW} />}
           </div>
@@ -320,146 +358,143 @@ export function JourneyGame() {
         </div>
 
         {/* 월드 */}
-        <div className="absolute inset-0" style={{ transform: `translateX(${-cam}px)` }}>
-          {objects.map((o) => {
-            const done = o.kind === "spot" && doneSpots.includes(o.id);
-            return (
-              <div key={o.id} data-object={o.id} className="absolute" style={{ left: o.x, bottom: laneBottom(o.lane), zIndex: Math.round((1 - o.lane) * 10), transform: `translateX(-50%) scale(${laneScale(o.lane)})`, transformOrigin: "bottom" }}>
-                {o.kind === "spot" && <SpotArt done={done} />}
-                {o.kind === "portal" && <PortalArt open={regionDone} />}
-                {o.kind === "gate" && <GateArt />}
+        <div className="absolute inset-0 will-change-transform" style={{ transform: `translate3d(${-view.cam}px,0,0)` }}>
+          {region.theme === "plain" &&
+            [500, 950, 1400].map((x, i) => (
+              <div key={x} className="absolute opacity-60 anim-drift" style={{ left: x, bottom: laneBottom(0.7 - i * 0.2), transform: `translateX(-50%) scale(${laneScale(0.7 - i * 0.2)})`, transformOrigin: "bottom", animationDuration: `${8 + i * 3}s` }}>
+                <ObjectArt kind="shadow" open={false} />
               </div>
-            );
-          })}
-          {/* 별의 아이 (동행) */}
-          {phase !== "letterDrop" && phase !== "letter" && phase !== "capsule" && (
-            <div className="absolute transition-[left] duration-300" style={{ left: companionX, bottom: `calc(${laneBottom(pos.lane)} + 40px)`, zIndex: 12, transform: `translateX(-50%) scale(${laneScale(pos.lane) * 0.75})`, transformOrigin: "bottom" }}>
-              <StarChild moving={false} dissolve={phase === "farewell"} />
+            ))}
+          {region.theme === "house" &&
+            HOUSE_FRAGMENTS.filter((f) => !houseFrags.includes(f.id)).map((f) => (
+              <div key={f.id} data-object={f.id} className="absolute" style={{ left: f.x, bottom: laneBottom(f.lane), zIndex: Math.round((1 - f.lane) * 10), transform: `translateX(-50%) scale(${laneScale(f.lane) * 0.7})`, transformOrigin: "bottom" }}>
+                <ObjectArt kind="fragment" open={false} />
+              </div>
+            ))}
+          {objects.map((o) => (
+            <div key={o.id} data-object={o.id} className="absolute" style={{ left: o.x, bottom: laneBottom(o.lane), zIndex: Math.round((1 - o.lane) * 10), transform: `translateX(-50%) scale(${laneScale(o.lane)})`, transformOrigin: "bottom" }}>
+              {o.kind === "spot" ? <ObjectArt kind="memory" open={false} /> : <GateArt kind={region.gate.minigame} open={spotsDone} />}
             </div>
-          )}
-          {/* 남겨진 편지 */}
-          {(phase === "letterDrop" || phase === "letter" || phase === "capsule") && (
-            <button
-              type="button"
-              aria-label="별의 아이의 편지 열기"
-              onClick={() => setPhase("letter")}
-              className="absolute animate-[bounce_2s_infinite]"
-              style={{ left: companionX, bottom: laneBottom(pos.lane), zIndex: 15, transform: "translateX(-50%)" }}
-            >
+          ))}
+          {/* 나 = 별의 아이 */}
+          {phase !== "letterDrop" && phase !== "letter" && phase !== "capsule" ? (
+            <div className="absolute" style={{ left: view.x, bottom: laneBottom(view.lane), zIndex: Math.round((1 - view.lane) * 10) + 1, transform: `translateX(-50%) scale(${laneScale(view.lane) * view.flip}, ${laneScale(view.lane)}) rotate(${view.tilt}deg)`, transformOrigin: "bottom" }}>
+              <div key={hop} className={hop ? "anim-hop" : undefined}>
+                <div className={motion}><StarChild moving={view.speed > 25} dissolve={dissolve} /></div>
+              </div>
+            </div>
+          ) : (
+            <button type="button" aria-label="남겨진 편지 열기" onClick={() => setPhase("letter")} className="absolute animate-[bounce_2s_infinite]" style={{ left: view.x, bottom: laneBottom(view.lane), zIndex: 15, transform: "translateX(-50%)" }}>
               <EnvelopeArt />
             </button>
           )}
-          {/* 플레이어 */}
-          <div className="absolute" style={{ left: pos.x, bottom: laneBottom(pos.lane), zIndex: Math.round((1 - pos.lane) * 10) + 1, transform: `translateX(-50%) scale(${laneScale(pos.lane) * pos.facing}, ${laneScale(pos.lane)})`, transformOrigin: "bottom" }}>
-            <Traveler moving={pos.moving} />
-          </div>
         </div>
 
-        <div className="pointer-events-none absolute inset-0 z-20 will-change-transform" style={{ transform: `translateX(${-cam * 1.25}px)` }}>
+        <div className="pointer-events-none absolute inset-0 z-20 will-change-transform" style={{ transform: `translate3d(${-view.cam * 1.25}px,0,0)` }}>
           <Foreground stage={stage} width={region.width * 1.25 + viewW} />
         </div>
         <div className="pointer-events-none absolute inset-0 shadow-[inset_0_0_120px_rgba(15,10,40,0.8)]" />
 
         {/* HUD */}
-        {phase !== "title" && phase !== "guide" && (
+        {!["title", "guide"].includes(phase) && (
           <div className="absolute left-3 top-3 z-30 flex items-center gap-2 rounded-full bg-black/35 px-3 py-1 text-xs text-amber-50">
             <span>{region.name}</span>
-            <span>{"✦".repeat(regionIdx)}{"·".repeat(4 - Math.min(4, regionIdx))}</span>
-            {source === "demo" && <span className="text-amber-200">⚪ AI 미연결</span>}
+            <span aria-label="되찾은 별 조각">{"✦".repeat(regionIdx)}{"·".repeat(REGIONS.length - regionIdx)}</span>
+            {region.theme === "house" && <span>조각 {houseFrags.length}/3</span>}
+            {source === "tilon" && <span>🟢 틸론</span>}
+            {source === "llm" && <span>🟢 AI</span>}
           </div>
         )}
         <div className="absolute right-3 top-3 z-30 flex gap-2">
-          <button type="button" aria-label="전체화면" className="rounded-full bg-black/35 p-1.5 text-amber-50" onClick={() => (document.fullscreenElement ? document.exitFullscreen() : viewRef.current?.requestFullscreen())}>
-            <Maximize className="size-4" />
-          </button>
-          <button type="button" aria-label={muted ? "소리 켜기" : "소리 끄기"} className="rounded-full bg-black/35 p-1.5 text-amber-50" onClick={() => { setMuted(!muted); setMute(!muted); }}>
-            {muted ? <VolumeX className="size-4" /> : <Volume2 className="size-4" />}
-          </button>
+          <button type="button" aria-label="전체화면" className="rounded-full bg-black/35 p-1.5 text-amber-50" onClick={() => (document.fullscreenElement ? document.exitFullscreen() : viewRef.current?.requestFullscreen())}><Maximize className="size-4" /></button>
+          <button type="button" aria-label={muted ? "소리 켜기" : "소리 끄기"} className="rounded-full bg-black/35 p-1.5 text-amber-50" onClick={() => { setMuted(!muted); setMute(!muted); }}>{muted ? <VolumeX className="size-4" /> : <Volume2 className="size-4" />}</button>
         </div>
 
-        {/* 상호작용 안내 */}
         {phase === "explore" && !talk && near && (
-          <button type="button" onClick={interact} className="absolute bottom-[54%] left-1/2 z-30 -translate-x-1/2 animate-bounce rounded-full bg-amber-100/90 px-3 py-1 text-sm font-bold text-indigo-950">
-            SPACE · {near.label}
-          </button>
+          <button type="button" onClick={interact} className="absolute bottom-[54%] left-1/2 z-30 -translate-x-1/2 animate-bounce rounded-full bg-amber-100/90 px-3 py-1 text-sm font-bold text-indigo-950">SPACE · {near.label}</button>
         )}
 
-        {/* 대사 / 질문 */}
+        {/* 대사 / 물음 */}
         {talk && (line || asking) && (
           <div className="absolute inset-x-3 bottom-3 z-30 rounded-xl bg-indigo-950/90 p-3 text-indigo-50 ring-1 ring-amber-200/30" data-testid="dialogue">
-            <p className="text-xs font-bold text-amber-200">✦ 별의 아이</p>
             {line ? (
               <button type="button" onClick={advance} className="block w-full text-left">
-                <p className="min-h-6 leading-relaxed">{line.slice(0, typed)}</p>
+                {SPEAKER[line.who] && <p className="text-xs font-bold text-amber-200">{SPEAKER[line.who]}</p>}
+                <p className={cn("min-h-6 leading-relaxed", line.who === "system" && "text-center text-sm text-indigo-200")}>{line.text.slice(0, typed)}</p>
                 <p className="text-right text-[10px] text-indigo-300">{fullyTyped ? "SPACE ▶" : "SPACE 건너뛰기"}</p>
               </button>
-            ) : (
-              asking && (
-                <div className="space-y-2">
-                  <p className="font-medium leading-relaxed" data-testid="question">{talk.ask!.question}</p>
-                  <div className="flex items-end gap-2">
-                    <textarea
-                      ref={inputRef}
-                      value={answer}
-                      onChange={(e) => setAnswer(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
-                          e.preventDefault();
-                          submitAnswer();
-                        }
-                      }}
-                      rows={2}
-                      maxLength={1000}
-                      disabled={waiting}
-                      placeholder="자유롭게 적어 줘. 짧아도 괜찮아. (Enter 보내기)"
-                      aria-label="나의 대답"
-                      className="min-h-12 flex-1 resize-none rounded-lg bg-white/10 p-2 text-sm text-white outline-none ring-1 ring-white/20 placeholder:text-indigo-300 focus:ring-amber-200/60"
-                    />
-                    <Button size="icon-lg" onClick={submitAnswer} disabled={waiting} aria-label="대답 보내기">
-                      {waiting ? <Loader2 className="animate-spin" /> : <Send />}
-                    </Button>
+            ) : asking && (
+              <div className="space-y-2">
+                <p className="text-xs font-bold text-amber-200">✦ 마음속에 떠오른 물음</p>
+                <p className="font-medium leading-relaxed" data-testid="question">{asking.question}</p>
+                {aiError ? (
+                  <div className="space-y-2 rounded-lg bg-rose-950/60 p-2 text-sm" data-testid="ai-error">
+                    <p>⚠ {aiError}</p>
+                    <div className="flex flex-wrap gap-2">
+                      <Button size="sm" onClick={() => submitAnswer()} disabled={waiting}><RotateCcw /> 다시 시도</Button>
+                      <Button size="sm" variant="secondary" onClick={() => submitAnswer(true)}>AI 반응 없이 기록만 하고 계속</Button>
+                    </div>
                   </div>
-                </div>
-              )
+                ) : (
+                  <div className="flex items-end gap-2">
+                    <textarea ref={inputRef} value={answer} onChange={(e) => setAnswer(e.target.value)} rows={2} maxLength={1000} disabled={waiting} aria-label="나의 대답"
+                      onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); submitAnswer(); } }}
+                      placeholder="떠오르는 대로 자유롭게. 짧아도 괜찮아. (Enter)"
+                      className="min-h-12 flex-1 resize-none rounded-lg bg-white/10 p-2 text-sm text-white outline-none ring-1 ring-white/20 placeholder:text-indigo-300 focus:ring-amber-200/60" />
+                    <Button size="icon-lg" onClick={() => submitAnswer()} disabled={waiting} aria-label="대답 보내기">{waiting ? <Loader2 className="animate-spin" /> : <Send />}</Button>
+                  </div>
+                )}
+              </div>
             )}
           </div>
         )}
 
-        {/* 별의 아이가 사라진 뒤 */}
-        {phase === "letterDrop" && (
-          <p className="absolute inset-x-0 top-[22%] z-30 text-center text-lg font-medium text-amber-50" style={{ textShadow: "0 0 12px #000" }}>
-            편지를 확인하려면 마우스로 눌러 주세요.
-          </p>
+        {/* 관문 미니게임 */}
+        {phase === "minigame" && (
+          region.gate.minigame === "light" ? <LightPuzzle onSolved={passGate} /> : (
+            <Overlay title={region.gate.label} story={region.gate.story}>
+              {region.gate.minigame === "shadow" && <ShadowField onSolved={passGate} />}
+              {region.gate.minigame === "memory" && <MemoryOrder cards={memoryCards} onSolved={passGate} />}
+              {region.gate.minigame === "constellation" && <Constellation labels={REGIONS.map((r) => r.name)} onSolved={passGate} />}
+              <Button size="sm" variant="ghost" className="w-full text-indigo-200" onClick={() => setPhase("explore")}>잠시 둘러보기</Button>
+            </Overlay>
+          )
         )}
 
-        {/* 편지 */}
+        {phase === "letterDrop" && (
+          <p className="absolute inset-x-0 top-[22%] z-30 text-center text-lg font-medium text-amber-50" style={{ textShadow: "0 0 12px #000" }}>편지를 확인하려면 마우스로 눌러 주세요.</p>
+        )}
+
         {phase === "letter" && (
           <div className="absolute inset-0 z-40 flex items-center justify-center bg-indigo-950/70 p-3 backdrop-blur-sm">
             <div className="max-h-full w-full max-w-xl overflow-y-auto rounded-2xl bg-[#fffaf0] p-5 text-[#4a3728] shadow-2xl ring-4 ring-amber-200/60" data-testid="letter">
-              {!letter ? (
-                <p className="flex items-center justify-center gap-2 py-10 text-sm"><Loader2 className="size-4 animate-spin" /> 별의 아이가 편지를 쓰고 있어…</p>
-              ) : (
+              {letter ? (
                 <>
                   <p className="whitespace-pre-wrap font-medium leading-loose">{letter.letter}</p>
-                  {(letter.facts.length > 0 || letter.discoveries.length > 0) && (
-                    <div className="mt-4 grid gap-3 border-t border-amber-200 pt-3 text-xs sm:grid-cols-2">
-                      <div>
-                        <p className="mb-1 font-bold">✦ 네가 직접 들려준 것</p>
-                        <ul className="list-disc space-y-0.5 pl-4">{letter.facts.map((f, i) => <li key={i}>{f}</li>)}</ul>
-                      </div>
-                      {letter.discoveries.length > 0 && (
-                        <div>
-                          <p className="mb-1 font-bold">✧ 별의 아이가 발견한 것</p>
-                          <ul className="list-disc space-y-0.5 pl-4">{letter.discoveries.map((f, i) => <li key={i}>{f}</li>)}</ul>
-                        </div>
-                      )}
+                  <div className="mt-4 grid gap-3 border-t border-amber-200 pt-3 text-xs sm:grid-cols-2">
+                    <div><p className="mb-1 font-bold">✦ 네가 직접 들려준 것</p><ul className="list-disc space-y-0.5 pl-4">{letter.facts.map((f, i) => <li key={i}>{f}</li>)}</ul></div>
+                    {letter.discoveries.length > 0 && <div><p className="mb-1 font-bold">✧ 별빛이 발견한 것</p><ul className="list-disc space-y-0.5 pl-4">{letter.discoveries.map((f, i) => <li key={i}>{f}</li>)}</ul></div>}
+                  </div>
+                  <p className="mt-3 text-right text-[10px] text-[#8a7360]">{letter.source === "tilon" ? "🟢 틸론 GPU" : "🟢 AI"}가 기록된 답변으로 쓴 편지</p>
+                  <div className="mt-4 flex justify-center"><Button onClick={() => setPhase("capsule")}>미래의 나에게 타임캡슐 남기기</Button></div>
+                </>
+              ) : letterError ? (
+                <div className="space-y-3 text-center text-sm" data-testid="letter-error">
+                  <p>⚠ {letterError}</p>
+                  <div className="flex flex-wrap justify-center gap-2">
+                    <Button onClick={fetchLetter}><RotateCcw /> 편지 다시 받기</Button>
+                    <Button variant="outline" onClick={() => setShowRaw((v) => !v)}>기록된 내 이야기 보기</Button>
+                    <Button variant="outline" onClick={() => setPhase("capsule")}>타임캡슐로</Button>
+                  </div>
+                  {showRaw && (
+                    <div className="space-y-2 text-left">
+                      <p className="text-xs text-[#8a7360]">AI 편지가 아니라, 여행 중 직접 남긴 답변 기록이에요.</p>
+                      {history.map((h, i) => <p key={i}><b>{h.question}</b><br />{h.answer}</p>)}
                     </div>
                   )}
-                  <p className="mt-3 text-right text-[10px] text-[#8a7360]">{letter.source === "demo" ? "⚪ AI 미연결 — 답변을 모은 기본 편지" : letter.source === "tilon" ? "🟢 틸론 GPU가 쓴 편지" : "🟢 AI가 쓴 편지"}</p>
-                  <div className="mt-4 flex justify-center">
-                    <Button onClick={() => setPhase("capsule")}>미래의 나에게 타임캡슐 남기기</Button>
-                  </div>
-                </>
+                </div>
+              ) : (
+                <p className="flex items-center justify-center gap-2 py-10 text-sm"><Loader2 className="size-4 animate-spin" /> 별빛이 편지를 쓰고 있어…</p>
               )}
             </div>
           </div>
@@ -467,18 +502,18 @@ export function JourneyGame() {
 
         {phase === "capsule" && (
           <div className="absolute inset-0 z-40 flex items-center justify-center bg-indigo-950/75 p-3 backdrop-blur-sm">
-            <div className="max-h-full w-full max-w-xl overflow-y-auto rounded-2xl bg-card p-5 shadow-2xl">
+            <div className="max-h-full w-full max-w-xl space-y-3 overflow-y-auto rounded-2xl bg-card p-5 shadow-2xl">
               <TimeCapsule letterExcerpt={letter?.letter.slice(0, 120)} onSaved={() => toast.success("타임캡슐을 묻었어요. 아래 목록에서 확인할 수 있어요.")} />
+              <Button variant="ghost" className="w-full" onClick={restart}>처음부터 다시 여행하기</Button>
             </div>
           </div>
         )}
 
-        {/* 시작 화면 → 조작 안내 */}
         {phase === "title" && (
           <div className="absolute inset-0 z-50 flex flex-col items-center justify-center gap-4 bg-indigo-950/40 text-center text-amber-50">
             <p className="text-xs tracking-[0.3em] text-amber-200">AT THE END OF STARS</p>
             <h2 className="text-3xl font-black sm:text-4xl" style={{ textShadow: "0 0 20px #fde68a" }}>별의 끝에서</h2>
-            <p className="max-w-sm text-sm text-indigo-100">별의 아이와 함께 걸으며, 너의 이야기를 들려줘.</p>
+            <p className="max-w-sm text-sm text-indigo-100">기억을 잃은 별의 아이가 되어, 별빛 세계에서 나를 다시 찾아가는 여행.</p>
             <Button size="lg" onClick={() => setPhase("guide")}>시작하기</Button>
           </div>
         )}
@@ -487,84 +522,36 @@ export function JourneyGame() {
             <div className="w-full max-w-sm space-y-4 rounded-2xl bg-indigo-950/90 p-5 text-center ring-1 ring-amber-200/40" data-testid="guide">
               <p className="font-bold text-amber-100">조작 방법</p>
               <ul className="space-y-2 text-sm">
-                <li><b className="rounded bg-white/15 px-2 py-0.5">W A S D</b> 캐릭터 이동</li>
+                <li><b className="rounded bg-white/15 px-2 py-0.5">W A S D</b> 이동 · <b className="rounded bg-white/15 px-2 py-0.5">Shift</b> 달리기</li>
                 <li><b className="rounded bg-white/15 px-2 py-0.5">SPACE</b> 대화 · 텍스트 건너뛰기</li>
                 <li><b className="rounded bg-white/15 px-2 py-0.5">마우스</b> 편지 확인 · 상호작용</li>
               </ul>
-              <p className="text-xs text-indigo-200">질문에는 자유롭게 글로 대답해 줘. 정답은 없어.</p>
+              <p className="text-xs text-indigo-200">떠오르는 물음에는 자유롭게 글로 답해 줘. 정답은 없어.</p>
               <Button onClick={beginJourney}>여행 시작 (SPACE)</Button>
             </div>
           </div>
         )}
       </div>
 
-      {/* 모바일 조작 */}
       <div className="flex items-center justify-between gap-2 sm:hidden">
         <div className="flex gap-2">
-          {[["left", "◀"], ["right", "▶"], ["up", "▲"], ["down", "▼"]].map(([k, l]) => (
-            <Button key={k} variant="secondary" size="icon-lg" aria-label={k} {...hold(k)}>{l}</Button>
-          ))}
+          {[["left", "◀"], ["right", "▶"], ["up", "▲"], ["down", "▼"]].map(([k, l]) => <Button key={k} variant="secondary" size="icon-lg" aria-label={k} {...hold(k)}>{l}</Button>)}
         </div>
         <Button onClick={() => (talk && line ? advance() : interact())}>대화</Button>
       </div>
-      {farewellStep > 0 && <span className="sr-only">작별</span>}
     </div>
   );
 }
 
-/* ---------- 그림 ---------- */
-
-function Traveler({ moving }: { moving: boolean }) {
+function GateArt({ kind, open }: { kind: string; open: boolean }) {
+  if (kind === "light") return <ObjectArt kind="altar" open={open} />;
   return (
-    <svg viewBox="0 0 70 120" className={cn("h-32 w-[74px]", moving ? "anim-walk" : "anim-breathe")} aria-label="여행자(나)">
-      <defs>
-        <linearGradient id="coat" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#475569" />
-          <stop offset="1" stopColor="#1e293b" />
-        </linearGradient>
-      </defs>
-      <ellipse cx="35" cy="116" rx="17" ry="3.5" fill="#000" opacity=".35" />
-      <path d="M35 40 C 50 42 54 80 56 110 L 14 110 C 16 80 20 42 35 40Z" fill="url(#coat)" />
-      <path d="M24 46 Q 35 54 46 46 L 48 56 Q 35 62 22 56Z" fill="#f59e0b" />
-      <path d="M46 52 l 8 18" stroke="#f59e0b" strokeWidth="5" strokeLinecap="round" />
-      <circle cx="35" cy="28" r="13" fill="#fde7d4" />
-      <path d="M21 28 C 20 12 50 10 49 26 C 44 20 30 18 21 28Z" fill="#3f2a1e" />
-      <circle cx="31" cy="30" r="1.5" fill="#1f2937" />
-      <circle cx="40" cy="30" r="1.5" fill="#1f2937" />
-    </svg>
-  );
-}
-
-function SpotArt({ done }: { done: boolean }) {
-  return (
-    <svg viewBox="-40 -50 80 90" className={cn("h-20 w-16", !done && "animate-[bounce_2.4s_infinite]")} aria-label={done ? "들려준 이야기" : "이야기의 빛"}>
-      <ellipse cy="36" rx="20" ry="4" fill="#000" opacity=".3" />
-      <circle r="26" fill="#fde68a" opacity={done ? 0.08 : 0.22} />
-      <circle r="13" fill={done ? "#c4b5fd" : "#fffbeb"} opacity={done ? 0.5 : 1} style={{ filter: `drop-shadow(0 0 ${done ? 4 : 12}px #fde68a)` }} />
-      {!done && <path d="M0 -8 Q 1.5 -1.5 8 0 Q 1.5 1.5 0 8 Q -1.5 1.5 -8 0 Q -1.5 -1.5 0 -8Z" fill="#f59e0b" />}
-    </svg>
-  );
-}
-
-function PortalArt({ open }: { open: boolean }) {
-  return (
-    <div className="relative" aria-label="다음 장소로 가는 빛">
-      {open && <div className="absolute -inset-8 rounded-full bg-amber-200/40 blur-2xl" />}
-      <div className={cn("relative h-44 w-24 rounded-t-full border-4", open ? "border-amber-200 bg-gradient-to-b from-amber-50/90 to-amber-300/60" : "border-indigo-300/40 bg-indigo-950/50")} />
-    </div>
-  );
-}
-
-function GateArt() {
-  return (
-    <div className="relative" aria-label="마지막 관문">
-      <div className="absolute -inset-12 rounded-full bg-amber-100/30 blur-3xl" />
-      <svg viewBox="0 0 160 240" className="relative h-60 w-40">
-        <path d="M10 240 V 90 A 70 70 0 0 1 150 90 V 240Z" fill="none" stroke="#fde68a" strokeWidth="8" />
-        <path d="M26 240 V 94 A 54 54 0 0 1 134 94 V 240Z" fill="#fffbeb" opacity=".85" />
-        {[0, 1, 2, 3, 4].map((k) => (
-          <circle key={k} cx={30 + k * 25} cy={60 - Math.sin((k / 4) * Math.PI) * 40} r="4" fill="#fde68a" />
-        ))}
+    <div className="relative" aria-label="관문">
+      {open && <div className="absolute -inset-8 rounded-full bg-amber-200/35 blur-2xl" />}
+      <svg viewBox="0 0 120 200" className="relative h-48 w-28">
+        <path d="M8 200 V 60 A 52 52 0 0 1 112 60 V 200Z" fill="#2a1d52" stroke="#c4a86a" strokeWidth="5" />
+        <path d="M20 200 V 64 A 40 40 0 0 1 100 64 V 200Z" fill={open ? "#fef3c7" : "#1a1240"} opacity={open ? 0.9 : 1} />
+        <text x="60" y="130" textAnchor="middle" fontSize="34" fill={open ? "#b45309" : "#fde68a"}>{kind === "fragments" ? "✦" : kind === "shadow" ? "◐" : kind === "memory" ? "⌛" : "✶"}</text>
       </svg>
     </div>
   );

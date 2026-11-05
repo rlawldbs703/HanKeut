@@ -12,10 +12,11 @@ export const exchangeSchema = z.object({
 export type Exchange = z.infer<typeof exchangeSchema>;
 
 export const replyRequest = z.object({
+  regionId: t(20),
   topic: t(40),
   question: t(300).min(1),
   answer: t(1000).min(1),
-  isFollowUp: z.boolean().default(false),
+  turnInSpot: z.number().int().min(0).max(5).default(0),
   history: z.array(exchangeSchema).max(60),
 });
 

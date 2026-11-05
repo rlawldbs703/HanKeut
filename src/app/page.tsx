@@ -11,7 +11,7 @@ export default function HomePage() {
         <h1 className="sr-only">한끗차이</h1>
         <HankeutLogo className="mx-auto h-auto w-full max-w-md" />
         <p className="mx-auto max-w-lg text-muted-foreground">
-          별의 아이와 여행하며 나의 이야기를 꺼내 보고, 미니띠니와 편하게 이야기를 나눠요.
+          별의 아이가 되어 나의 이야기를 되찾고, 미니띠니와 편하게 이야기를 나눠요.
         </p>
       </section>
 
@@ -24,7 +24,7 @@ export default function HomePage() {
             <CardHeader>
               <CardTitle>별의 끝에서</CardTitle>
               <CardDescription>
-                멀티버스에서 온 별의 아이와 여러 장소를 여행하며 나의 과거·현재·감정·꿈을 이야기해요. 여행의 끝에서 별의 아이가 나만을 위한 편지를 남겨요.
+                기억을 잃은 별의 아이가 되어 다섯 장소의 관문을 넘으며 나의 과거·현재·감정·꿈을 떠올려요. 여행의 끝에서 나만을 위한 편지를 받아요.
               </CardDescription>
             </CardHeader>
           </Card>

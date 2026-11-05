@@ -1,84 +1,97 @@
-// 《별의 끝에서》 여행 지역과 질문 배치
-export type Theme = "house" | "garden" | "lake" | "hill" | "gate";
+// 《별의 끝에서》 — 플레이어 = 기억을 잃은 별의 아이. 지역마다 기억의 실마리(간접 질문)와 관문 미니게임.
+export type Theme = "house" | "garden" | "plain" | "attic" | "hall";
+export type Minigame = "fragments" | "light" | "shadow" | "memory" | "constellation";
 
 export interface Spot {
   id: string;
   x: number;
   lane: number;
-  label: string;
-  questions: string[]; // 순서대로 묻고, 답마다 별의 아이가 반응해요
+  label: string; // 풍경 속 오브젝트
+  seed: string; // 오브젝트를 보며 떠오르는 첫 물음 (이후는 LLM이 맥락에 맞게 이어감)
 }
 
 export interface Region {
   id: string;
   name: string;
-  topic: string; // AI에게 알려 줄 대화 주제
+  topic: string; // LLM에게 알려 줄 기억의 주제
   theme: Theme;
   width: number;
-  intro: string[]; // 지역에 들어설 때 별의 아이의 말
+  intro: string;
   spots: Spot[];
+  gate: { x: number; minigame: Minigame; label: string; story: string };
 }
 
-export const FIRST_QUESTION = "안녕! 먼저, 당신은 누구인가요?";
+export const FIRST_QUESTION = "…여긴 어디지? 나는 누구였을까. 떠오르는 대로, 나에 대해 말해 볼까?";
 
 export const REGIONS: Region[] = [
   {
-    id: "childhood",
-    name: "어린 별의 방",
+    id: "house",
+    name: "별의 집",
     topic: "어린 시절의 기억",
     theme: "house",
-    width: 1800,
-    intro: ["여긴 오래된 별빛이 모이는 방이야.", "빛나는 곳에 가 보면, 네 어린 시절 이야기가 떠오를지도 몰라."],
+    width: 2000,
+    intro: "낡은 별등이 흔들리는 집. 어딘가 익숙한 냄새가 난다.",
     spots: [
-      { id: "c1", x: 560, lane: 0.35, label: "작은 별빛", questions: ["어렸을 때의 나는 어떤 아이였어?", "그때 가장 좋아했던 것은 뭐였어?"] },
-      { id: "c2", x: 1180, lane: 0.65, label: "낡은 그림책", questions: ["어릴 때의 내가 지금의 나를 본다면 뭐라고 할까?"] },
+      { id: "h1", x: 520, lane: 0.3, label: "창가의 작은 의자", seed: "이 창가… 어릴 적 가장 오래 머물고 싶었던 곳은 어디였을까?" },
+      { id: "h2", x: 1150, lane: 0.7, label: "먼지 쌓인 장난감 상자", seed: "그때는 무엇만 있으면 하루 종일 행복했을까?" },
     ],
+    gate: { x: 1800, minigame: "fragments", label: "별의 집 문", story: "흩어진 별 조각 3개를 모으면 문이 열린다." },
   },
   {
-    id: "now",
-    name: "오늘의 정원",
+    id: "garden",
+    name: "잊혀진 정원",
     topic: "지금의 나",
     theme: "garden",
-    width: 1900,
-    intro: ["이번엔 지금의 너를 닮은 정원이야.", "꽃마다 오늘의 네 이야기가 숨어 있을 것 같아."],
+    width: 2000,
+    intro: "시든 꽃과 새 꽃이 함께 핀 정원. 오늘의 공기가 느껴진다.",
     spots: [
-      { id: "n1", x: 560, lane: 0.3, label: "피어나는 꽃", questions: ["지금의 나는 어떤 사람인 것 같아?", "예전과 비교해서 달라진 점이 있어?"] },
-      { id: "n2", x: 1260, lane: 0.7, label: "흔들리는 꽃", questions: ["요즘 가장 좋아하는 것은 뭐야?", "요즘 나를 가장 힘들게 하는 건 뭐야?"] },
+      { id: "g1", x: 520, lane: 0.35, label: "웃는 듯한 꽃", seed: "이 꽃처럼… 요즘 나를 웃게 만드는 작은 일은 무엇일까?" },
+      { id: "g2", x: 1150, lane: 0.65, label: "해 질 녘 벤치", seed: "하루가 끝나면 가장 먼저 떠오르는 생각은 뭘까?" },
     ],
+    gate: { x: 1800, minigame: "light", label: "빛의 제단", story: "거울을 돌려 빛을 수정까지 이으면 길이 열린다." },
   },
   {
-    id: "heart",
-    name: "마음의 호수",
+    id: "plain",
+    name: "그림자 평원",
     topic: "나의 감정과 관계",
-    theme: "lake",
-    width: 1900,
-    intro: ["여긴 조용한 호수야. 물에 비친 마음은 숨기기 어렵대.", "천천히 이야기해도 괜찮아."],
+    theme: "plain",
+    width: 2000,
+    intro: "바람이 낮게 우는 평원. 그림자들이 마음의 무게처럼 떠돈다.",
     spots: [
-      { id: "h1", x: 560, lane: 0.4, label: "물에 비친 빛", questions: ["다른 사람에게는 말하지 못했던 마음이 있어?", "힘들 때 나는 어떻게 쉬어?"] },
-      { id: "h2", x: 1260, lane: 0.6, label: "잔잔한 물결", questions: ["누군가에게 가장 듣고 싶은 말은 뭐야?", "다른 사람을 챙기느라 나를 놓친 적은 없어?"] },
+      { id: "p1", x: 520, lane: 0.4, label: "홀로 선 나무", seed: "마음이 무거운 날이면… 나는 어디로 가고 싶을까?" },
+      { id: "p2", x: 1150, lane: 0.6, label: "바람에 실린 편지 조각", seed: "누군가 나에게 건네줬으면 하는 말은 뭐였을까?" },
     ],
+    gate: { x: 1800, minigame: "shadow", label: "그림자 길", story: "그림자를 피해 빛이 남은 길로만 건너야 한다." },
   },
   {
-    id: "dream",
-    name: "꿈의 언덕",
+    id: "attic",
+    name: "시간의 다락",
     topic: "나의 꿈과 미래",
-    theme: "hill",
-    width: 1900,
-    intro: ["언덕 너머로 아직 오지 않은 날들이 보여.", "네가 가고 싶은 곳을 들려줘."],
+    theme: "attic",
+    width: 2000,
+    intro: "멈춘 시계와 아직 열지 않은 상자들. 앞으로의 시간이 쌓인 곳.",
     spots: [
-      { id: "d1", x: 560, lane: 0.35, label: "떠오르는 별", questions: ["앞으로 꼭 해보고 싶은 일이 있어?", "두려워도 도전하고 싶은 것은 뭐야?"] },
-      { id: "d2", x: 1260, lane: 0.65, label: "언덕 위 등불", questions: ["미래의 나는 어떤 모습이면 좋겠어?", "지금의 내가 미래의 나에게 꼭 전하고 싶은 말은?"] },
+      { id: "a1", x: 520, lane: 0.35, label: "빛바랜 지도", seed: "아직 가보지 못한 곳 중 꼭 가보고 싶은 곳은 어디일까?" },
+      { id: "a2", x: 1150, lane: 0.65, label: "먼 미래의 거울", seed: "거울 속 미래의 나는… 어떤 표정을 짓고 있을까?" },
     ],
+    gate: { x: 1800, minigame: "memory", label: "시간의 상자", story: "되찾은 기억을 순서대로 맞추면 상자가 열린다." },
   },
   {
-    id: "gate",
-    name: "마지막 관문",
-    topic: "작별",
-    theme: "gate",
-    width: 1400,
-    intro: ["저기 빛나는 문이 보여? 여행의 끝이야."],
+    id: "hall",
+    name: "별의 전당",
+    topic: "되찾은 나",
+    theme: "hall",
+    width: 1500,
+    intro: "모든 별빛이 모이는 전당. 이곳에서 나는 누구인지 알게 될 것 같다.",
     spots: [],
+    gate: { x: 1050, minigame: "constellation", label: "별자리 제단", story: "모은 별 조각으로 나의 별자리를 완성한다." },
   },
 ];
 
-export const ALL_QUESTIONS = REGIONS.flatMap((r) => r.spots.flatMap((s) => s.questions));
+/** LLM이 대화를 이어 갈 때 참고하는 지역별 남은 물음 (고정 질문으로 바로 쓰지 않음) */
+export const HINTS: Record<string, string> = {
+  house: "예전의 나에게 지금의 내가 찾아간다면 어떤 이야기를 들려줄까",
+  garden: "요즘 나는 어떤 순간에 가장 나다워질까",
+  plain: "다른 사람에게는 잘해 주면서 나에게는 아끼고 있는 것이 있을까",
+  attic: "지금의 내가 미래의 나에게 남기고 싶은 별빛은",
+};
