@@ -43,3 +43,8 @@ export const loadTiniProfile = (): TiniProfile | null => normalizeProfile(read<u
 export const saveTiniProfile = (p: TiniProfile) => write(KEYS.tini, p);
 export const loadTiniChat = () => read<TiniMessage[]>(KEYS.tiniChat, []);
 export const saveTiniChat = (m: TiniMessage[]) => write(KEYS.tiniChat, m.slice(-50));
+
+// 공동창작 마지막 결과 → PLAY의 '함께 만든 기억'으로 쓰여요.
+const CREATION_KEY = "hankeut:creation";
+export const saveCreation = (text: string) => write(CREATION_KEY, text.slice(0, 160));
+export const loadCreation = () => read<string | null>(CREATION_KEY, null);

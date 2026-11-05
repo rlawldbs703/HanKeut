@@ -1,20 +1,30 @@
 "use client";
 
 import { Loader2, RefreshCw, Sparkles } from "lucide-react";
+import Link from "next/link";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { extractElements } from "@/lib/create/mock";
 import type { CreationStep, Idea, Twist } from "@/lib/create/types";
+import { saveCreation } from "@/lib/storage";
 import { cn } from "@/lib/utils";
 import type { AiSource } from "@/types";
 
 const EMPTY: Idea = { title: "", genre: "", world: "", character: "", story: "" };
+// 대표 콘텐츠 《별의 끝에서》 원작 설정으로 바로 시작
+const STARS_PRESET: Idea = {
+  title: "별의 끝에서",
+  genre: "감성 스토리 퍼즐 어드벤처 (2.5D 탐험)",
+  world: "현실과 꿈의 경계에 있는 별빛 세계. 사람들의 기억이 빛으로 남는다.",
+  character: "기억을 잃은 별빛 아이, 과거의 목소리를 들려주는 라디오, 망각과 후회를 상징하는 그림자",
+  story: "소중한 누군가에게 별을 전하기 위해 별 조각을 모으며 기억을 되찾는다.",
+};
 const FIELDS: { key: keyof Idea; label: string; placeholder: string; long?: boolean }[] = [
   { key: "title", label: "제목", placeholder: "예: 별빛 탐험" },
   { key: "genre", label: "장르", placeholder: "예: 2.5D 탐험 퍼즐" },
@@ -71,6 +81,7 @@ export function CreateStudio() {
       });
       const next = [...steps, { chosen: pick, userEdit: edit.trim(), result: d.result }];
       setSteps(next);
+      saveCreation(edit.trim() || pick.title); // PLAY 정원에 함께 만든 기억으로 나타나요
       setQuestion(d.nextQuestion);
       setSource(d.source);
       setTwists([]);
@@ -92,6 +103,9 @@ export function CreateStudio() {
           <CardDescription>창작의 방향은 내가 정해요. 떠오르는 만큼만 적어도 괜찮아요.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
+          <Button variant="secondary" className="w-full" onClick={() => setIdea(STARS_PRESET)}>
+            ✦ 《별의 끝에서》 설정으로 채우기
+          </Button>
           {FIELDS.map((f) => (
             <div key={f.key} className="space-y-1">
               <Label htmlFor={f.key}>{f.label}</Label>
@@ -205,9 +219,9 @@ export function CreateStudio() {
           <Button onClick={() => loadTwists()}>
             <RefreshCw /> 다음 TWIST 받기
           </Button>
-          <Button variant="outline" disabled title="《별의 끝에서》 자료를 받은 뒤 연결할 예정이에요">
-            ④ PLAY (준비 중)
-          </Button>
+          <Link href="/play" className={buttonVariants({ variant: "outline" })}>
+            ④ PLAY · 별의 끝에서
+          </Link>
         </div>
       )}
     </div>
