@@ -9,7 +9,10 @@ export default function PlayPage() {
           공동창작으로 만든 기억이 잊혀진 정원에 나타나요. PC: ←→↑↓ 이동, Space 살펴보기 · 모바일: 아래 버튼
         </p>
       </div>
-      <PlayLoader />
+      {/* 게임 화면은 본문 폭보다 넓게 */}
+      <div className="relative left-1/2 w-[min(1200px,calc(100vw-2rem))] -translate-x-1/2">
+        <PlayLoader />
+      </div>
     </div>
   );
 }

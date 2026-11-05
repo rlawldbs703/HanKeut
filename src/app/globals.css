@@ -165,3 +165,26 @@
 @media (prefers-reduced-motion: reduce) {
   .tini-float, .tini-bounce, .tini-droop, .tini-wiggle, .tini-eyes { animation: none; }
 }
+
+/* 《별의 끝에서》 연출용 애니메이션 */
+@keyframes mote { 0% { transform: translateY(0) translateX(0); opacity: 0; } 15% { opacity: .9; } 100% { transform: translateY(-140px) translateX(30px); opacity: 0; } }
+@keyframes firefly { 0%,100% { transform: translate(0,0); opacity: .2; } 50% { transform: translate(18px,-14px); opacity: 1; } }
+@keyframes sway { 0%,100% { transform: rotate(-4deg); } 50% { transform: rotate(4deg); } }
+@keyframes twinkle { 0%,100% { opacity: .35; transform: scale(.8); } 50% { opacity: 1; transform: scale(1.15); } }
+@keyframes spin-slow { to { transform: rotate(360deg); } }
+@keyframes breathe { 0%,100% { transform: translateY(0) scaleY(1); } 50% { transform: translateY(-2px) scaleY(1.02); } }
+@keyframes walk-bob { 0%,100% { transform: translateY(0) rotate(-2deg); } 50% { transform: translateY(-5px) rotate(2deg); } }
+@keyframes drift { from { transform: translateX(-5%); } to { transform: translateX(5%); } }
+@keyframes shooting { 0% { transform: translate(0,0) rotate(-25deg); opacity: 0; } 5% { opacity: 1; } 20%,100% { transform: translate(-420px,190px) rotate(-25deg); opacity: 0; } }
+.anim-mote { animation: mote 7s linear infinite; }
+.anim-firefly { animation: firefly 4s ease-in-out infinite; }
+.anim-sway { transform-origin: top center; animation: sway 4s ease-in-out infinite; }
+.anim-twinkle { animation: twinkle 3s ease-in-out infinite; }
+.anim-spin-slow { animation: spin-slow 14s linear infinite; transform-box: fill-box; transform-origin: center; }
+.anim-breathe { animation: breathe 3s ease-in-out infinite; transform-origin: bottom; }
+.anim-walk { animation: walk-bob .45s ease-in-out infinite; transform-origin: bottom; }
+.anim-drift { animation: drift 18s ease-in-out infinite alternate; }
+.anim-shooting { animation: shooting 9s ease-in infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .anim-mote, .anim-firefly, .anim-sway, .anim-twinkle, .anim-spin-slow, .anim-breathe, .anim-walk, .anim-drift, .anim-shooting { animation: none; }
+}

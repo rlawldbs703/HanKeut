@@ -1,7 +1,7 @@
 "use client";
 
 // 《별의 끝에서》 2.5D 탐험 데모 — 별의 집 → 잊혀진 정원 → 엔딩
-import { Volume2, VolumeX } from "lucide-react";
+import { Maximize, Volume2, VolumeX } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -22,6 +22,7 @@ import {
 import { cn } from "@/lib/utils";
 import { playChime, playResolve, playShadow, setMuted, startAmbient, stopAmbient } from "./audio";
 import { LightPuzzle, RadioPuzzle } from "./puzzles";
+import { Floor, Foreground, Lanterns, MidLayer, Motes, ObjectArt, Sky, StarChild, StarField } from "./scene-art";
 
 type Phase = "title" | "explore" | "radio" | "light" | "ending" | "credits";
 interface Pos {
@@ -35,13 +36,6 @@ interface Pos {
 const SPEED = 260; // px/초
 const LANE_SPEED = 0.9;
 
-// 고정된 별 배치 (매번 같은 하늘)
-const STARS = Array.from({ length: 48 }, (_, i) => ({
-  left: (i * 47) % 100,
-  top: (i * 29) % 62,
-  size: 1 + (i % 3),
-  delay: (i % 7) * 0.4,
-}));
 
 function shadowX(base: number, t: number, i: number) {
   return base + Math.sin(t * 0.9 + i * 2) * 170;
@@ -270,56 +264,25 @@ export function StarsGame({ coCreated }: { coCreated?: string }) {
         data-fragments={fragments}
         data-x={Math.round(pos.x)}
         data-lane={pos.lane.toFixed(2)}
-        className="relative aspect-[16/10] w-full touch-none select-none overflow-hidden rounded-2xl bg-indigo-950 sm:aspect-video"
+        className="relative aspect-[16/10] w-full touch-none select-none overflow-hidden rounded-2xl bg-indigo-950 shadow-2xl ring-1 ring-indigo-900/40 sm:aspect-video"
       >
-        {/* 하늘 (희망에 따라 밝아짐) */}
-        <div
-          className="absolute inset-0 transition-[filter] duration-1000"
-          style={{
-            background:
-              stage === "house"
-                ? "linear-gradient(180deg,#1e1b4b 0%,#3b2a6b 55%,#6d4c8f 100%)"
-                : "linear-gradient(180deg,#2e1f5e 0%,#6b4c9a 50%,#e8b98a 100%)",
-            filter: `brightness(${0.65 + hope * 0.45}) saturate(${0.7 + hope * 0.5})`,
-          }}
-        />
-        {STARS.slice(0, 18 + Math.round(hope * 30)).map((s, i) => (
-          <span
-            key={i}
-            className="absolute animate-pulse rounded-full bg-amber-50"
-            style={{ left: `${s.left}%`, top: `${s.top}%`, width: s.size, height: s.size, animationDelay: `${s.delay}s`, boxShadow: "0 0 6px #fef3c7" }}
-          />
-        ))}
+        {/* 장면 전환 페이드 */}
+        {phase !== "title" && <div key={stage} className="animate-out fade-out fill-mode-forwards pointer-events-none absolute inset-0 z-[35] bg-black duration-1000" />}
 
-        {/* 먼 배경 (시차 0.2) */}
-        <div className="absolute inset-0" style={{ transform: `translateX(${-cam * 0.2}px)` }}>
-          <div className="absolute left-[60%] top-[10%] size-24 rounded-full bg-amber-100/80 blur-[2px]" style={{ boxShadow: "0 0 60px 20px rgba(254,243,199,.35)" }} />
-          <div className="absolute left-[10%] top-[30%] h-10 w-72 rounded-full bg-violet-200/20 blur-xl" />
-          <div className="absolute left-[120%] top-[22%] h-12 w-96 rounded-full bg-pink-200/20 blur-xl" />
+        {/* 하늘·성운·달빛 (희망에 따라 밝아짐) */}
+        <div className="absolute inset-0 transition-[filter] duration-1000" style={{ filter: `brightness(${0.7 + hope * 0.4}) saturate(${0.75 + hope * 0.45})` }}>
+          <Sky stage={stage} hope={hope} />
+        </div>
+        <StarField hope={hope} />
+
+        {/* 중간 배경 (시차 0.55) */}
+        <div className="absolute inset-0 will-change-transform" style={{ transform: `translateX(${-cam * 0.55}px)` }}>
+          <MidLayer stage={stage} width={W * 0.55 + viewW} />
+          {stage === "house" && <Lanterns width={W * 0.55 + viewW} />}
         </div>
 
-        {/* 중간 배경 (시차 0.55): 장소별 실루엣 */}
-        <div className="absolute inset-0" style={{ transform: `translateX(${-cam * 0.55}px)` }}>
-          {Array.from({ length: 8 }, (_, i) =>
-            stage === "house" ? (
-              <div key={i} className="absolute bottom-[34%] h-[38%] w-28 rounded-t-full border-4 border-amber-100/20 bg-indigo-900/40" style={{ left: i * 260 + 60 }}>
-                <div className="mx-auto mt-6 size-10 rounded-full bg-amber-200/40 blur-[1px]" />
-              </div>
-            ) : (
-              <div key={i} className="absolute bottom-[34%]" style={{ left: i * 280 + 40 }}>
-                <div className="h-40 w-36 rounded-t-full border-[6px] border-emerald-100/25" />
-                <div className="-mt-3 flex gap-2">
-                  {[0, 1, 2].map((k) => (
-                    <span key={k} className="size-4 rounded-full bg-pink-200/50 blur-[1px]" />
-                  ))}
-                </div>
-              </div>
-            )
-          )}
-        </div>
-
-        {/* 바닥 */}
-        <div className="absolute inset-x-0 bottom-0 h-[38%]" style={{ background: stage === "house" ? "linear-gradient(180deg,#4c3a7a,#2a1f4d)" : "linear-gradient(180deg,#5f7a8a,#2f3f5a)" }} />
+        <Floor stage={stage} />
+        <Motes stage={stage} hope={hope} />
 
         {/* 월드 (오브젝트 + 주인공) */}
         <div className="absolute inset-0" style={{ transform: `translateX(${-cam}px)` }}>
@@ -349,6 +312,11 @@ export function StarsGame({ coCreated }: { coCreated?: string }) {
           </div>
         </div>
 
+        {/* 앞쪽 흐림 (시차 1.25, 심도) */}
+        <div className="pointer-events-none absolute inset-0 z-20 will-change-transform" style={{ transform: `translateX(${-cam * 1.25}px)` }}>
+          <Foreground stage={stage} width={W * 1.25 + viewW} />
+        </div>
+
         {/* 수채화 질감 + 비네트 */}
         <svg className="pointer-events-none absolute inset-0 size-full opacity-[0.18] mix-blend-soft-light" aria-hidden>
           <filter id="paper">
@@ -366,6 +334,14 @@ export function StarsGame({ coCreated }: { coCreated?: string }) {
             <span aria-label={`별 조각 ${fragments}개`}>{"✦".repeat(fragments)}{"·".repeat(4 - fragments)}</span>
           </div>
         )}
+        <button
+          type="button"
+          aria-label="전체화면"
+          className="absolute right-12 top-3 z-30 rounded-full bg-black/30 p-1.5 text-amber-50"
+          onClick={() => (document.fullscreenElement ? document.exitFullscreen() : viewRef.current?.requestFullscreen())}
+        >
+          <Maximize className="size-4" />
+        </button>
         <button
           type="button"
           aria-label={muted ? "소리 켜기" : "소리 끄기"}
@@ -482,81 +458,4 @@ export function StarsGame({ coCreated }: { coCreated?: string }) {
       </div>
     </div>
   );
-}
-
-/* ---------- 그림 ---------- */
-
-function StarChild({ moving, dissolve }: { moving: boolean; dissolve: boolean }) {
-  return (
-    <div className={cn("relative transition-all duration-[3000ms]", dissolve && "scale-125 opacity-0 blur-md")}>
-      <svg viewBox="0 0 60 90" className={cn("h-24 w-16", moving && "animate-[bounce_0.6s_infinite]")} aria-label="별빛 아이">
-        <defs>
-          <radialGradient id="glow" cx="50%" cy="40%" r="60%">
-            <stop offset="0%" stopColor="#fffbeb" />
-            <stop offset="70%" stopColor="#fde68a" stopOpacity="0.8" />
-            <stop offset="100%" stopColor="#c4b5fd" stopOpacity="0" />
-          </radialGradient>
-        </defs>
-        <ellipse cx="30" cy="86" rx="14" ry="3" fill="#000" opacity="0.25" />
-        <circle cx="30" cy="40" r="28" fill="url(#glow)" opacity="0.6" />
-        <path d="M30 34 C 42 34 46 60 44 80 L 16 80 C 14 60 18 34 30 34 Z" fill="#ede9fe" stroke="#a78bfa" strokeWidth="1.5" />
-        <circle cx="30" cy="26" r="13" fill="#fffbeb" stroke="#a78bfa" strokeWidth="1.5" />
-        <circle cx="25" cy="27" r="1.6" fill="#4c1d95" />
-        <circle cx="35" cy="27" r="1.6" fill="#4c1d95" />
-        <path d="M30 2 L33 10 L41 11 L35 16 L37 24 L30 20 L23 24 L25 16 L19 11 L27 10 Z" fill="#fde68a" stroke="#b45309" strokeWidth="1" />
-      </svg>
-      {dissolve && (
-        <div className="absolute inset-0">
-          {Array.from({ length: 14 }, (_, i) => (
-            <span key={i} className="absolute size-1.5 animate-ping rounded-full bg-amber-100" style={{ left: `${(i * 37) % 100}%`, top: `${(i * 53) % 100}%`, animationDelay: `${i * 0.12}s` }} />
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function ObjectArt({ kind, open }: { kind: WorldObject["kind"]; open: boolean }) {
-  switch (kind) {
-    case "fragment":
-      return (
-        <div className="animate-[bounce_2s_infinite] text-4xl text-amber-200" style={{ filter: "drop-shadow(0 0 12px #fde68a)" }} aria-label="별 조각">
-          ✦
-        </div>
-      );
-    case "radio":
-      return (
-        <svg viewBox="0 0 60 44" className="h-12 w-16" aria-label="라디오">
-          <rect x="4" y="12" width="52" height="30" rx="6" fill="#a16207" stroke="#451a03" strokeWidth="2" />
-          <circle cx="20" cy="27" r="8" fill="#fde68a" stroke="#451a03" strokeWidth="2" />
-          <rect x="34" y="20" width="16" height="4" rx="2" fill="#451a03" />
-          <rect x="34" y="28" width="16" height="4" rx="2" fill="#451a03" />
-          <path d="M14 12 L30 2" stroke="#451a03" strokeWidth="2" />
-        </svg>
-      );
-    case "door":
-      return (
-        <div className={cn("h-40 w-24 rounded-t-full border-4", open ? "border-amber-200 bg-amber-100/60 shadow-[0_0_40px_#fde68a]" : "border-indigo-300/50 bg-indigo-950/70")} aria-label="문" />
-      );
-    case "memory":
-      return (
-        <div className="animate-pulse text-3xl" style={{ filter: "drop-shadow(0 0 10px #f9a8d4)" }} aria-label="기억">
-          ❀
-        </div>
-      );
-    case "altar":
-      return (
-        <div className="flex flex-col items-center" aria-label="빛의 제단">
-          <div className={cn("text-4xl", open ? "text-amber-200 drop-shadow-[0_0_16px_#fde68a]" : "text-violet-300")}>◆</div>
-          <div className="h-12 w-14 rounded-t-lg bg-slate-300/40" />
-        </div>
-      );
-    case "shadow":
-      return (
-        <div className="relative h-24 w-20 rounded-t-full bg-black/70 blur-[3px]" aria-label="그림자">
-          <span className="absolute left-5 top-8 size-1.5 rounded-full bg-violet-300/70" />
-          <span className="absolute right-5 top-8 size-1.5 rounded-full bg-violet-300/70" />
-        </div>
-      );
-  }
 }
