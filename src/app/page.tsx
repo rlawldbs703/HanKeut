@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { HankeutLogo } from "@/components/brand/hankeut-logo";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -26,16 +27,16 @@ const FEATURES = [
 export default function HomePage() {
   return (
     <div className="space-y-8">
-      <section className="space-y-4 rounded-2xl bg-gradient-to-br from-primary/15 via-background to-background p-6 sm:p-10">
-        <p className="text-sm font-semibold text-primary">AI 사고력 게임 · THINK ARENA</p>
-        <h1 className="text-3xl font-black leading-tight sm:text-4xl">
-          AI에게 답을 묻지 말고,
-          <br />
-          AI와 <span className="text-primary">대결</span>하세요.
-        </h1>
-        <p className="text-muted-foreground">
-          좋은 대화는 &lsquo;한끗 차이&rsquo;에서 갈려요. 현실 같은 대화 상황에서 직접 문장을 만들고, AI가 실시간으로
-          반응하고 평가해 줘요.
+      <section className="space-y-5 rounded-3xl border bg-gradient-to-b from-secondary/70 to-background p-6 text-center sm:p-10">
+        <h1 className="sr-only">한끗차이</h1>
+        <HankeutLogo className="mx-auto h-auto w-full max-w-md" />
+        <p className="text-sm font-semibold tracking-widest text-primary/80">THINK ARENA</p>
+        <p className="text-xl font-black leading-snug sm:text-2xl">
+          AI에게 답을 묻지 말고, AI와 <span className="rounded bg-accent px-1">대결</span>하세요.
+        </p>
+        <p className="mx-auto max-w-lg text-muted-foreground">
+          좋은 대화는 &lsquo;한끗 차이&rsquo;에서 갈려요. 현실 같은 대화 상황에서 직접 문장을 만들고, 상대의 반응과
+          평가로 내 표현력을 키워요.
         </p>
         <Link href="/battle" className={buttonVariants({ size: "lg", className: "h-11 px-6 text-base" })}>
           대결 시작하기 →
@@ -45,7 +46,7 @@ export default function HomePage() {
       <section className="grid gap-4 sm:grid-cols-3">
         {FEATURES.map((f) => (
           <Link key={f.href} href={f.href} className="group">
-            <Card className="h-full transition group-hover:ring-2 group-hover:ring-primary/40">
+            <Card className="h-full transition group-hover:ring-2 group-hover:ring-accent">
               <CardHeader>
                 <div className="text-3xl">{f.emoji}</div>
                 <CardTitle>{f.title}</CardTitle>

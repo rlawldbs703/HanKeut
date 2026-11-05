@@ -1,27 +1,17 @@
 import Link from "next/link";
+import { HankeutLogo } from "@/components/brand/hankeut-logo";
 import { AiStatusBadge } from "./ai-status-badge";
-
-const NAV = [
-  { href: "/battle", label: "한끗차이" },
-  { href: "/tini", label: "MY MINI-TTINI" },
-  { href: "/growth", label: "MY GROWTH" },
-];
+import { NavLinks } from "./nav-links";
 
 export function SiteHeader() {
   return (
-    <header className="sticky top-0 z-10 border-b bg-background/90 backdrop-blur">
-      <div className="mx-auto flex max-w-3xl flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">
-        <Link href="/" className="font-black tracking-tight">
-          한끗차이 <span className="text-xs font-medium text-primary">THINK ARENA</span>
+    <header className="sticky top-0 z-20 border-b bg-background/90 backdrop-blur">
+      <div className="mx-auto flex max-w-3xl items-center gap-3 px-4 py-2">
+        <Link href="/" aria-label="한끗차이 홈" className="shrink-0">
+          <HankeutLogo compact className="h-10 w-auto sm:h-11" />
         </Link>
-        <nav className="flex gap-3 text-sm text-muted-foreground">
-          {NAV.map((n) => (
-            <Link key={n.href} href={n.href} className="hover:text-foreground">
-              {n.label}
-            </Link>
-          ))}
-        </nav>
-        <div className="ml-auto">
+        <NavLinks />
+        <div className="ml-auto hidden sm:block">
           <AiStatusBadge />
         </div>
       </div>
