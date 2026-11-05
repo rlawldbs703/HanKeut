@@ -26,7 +26,7 @@ import {
 export type WithSource<T> = T & { source: AiSource; fallbackReason?: string };
 
 /** JSON 응답을 받아 검사해요. 형식이 틀리면 한 번 더 요청해요. */
-async function askJson<S extends z.ZodTypeAny>(
+export async function askJson<S extends z.ZodTypeAny>(
   config: AiConfig,
   messages: ChatMessage[],
   schema: S,
@@ -49,7 +49,7 @@ async function askJson<S extends z.ZodTypeAny>(
   throw lastError;
 }
 
-async function withFallback<T>(
+export async function withFallback<T>(
   run: (config: AiConfig) => Promise<T>,
   demo: () => T
 ): Promise<WithSource<T>> {
