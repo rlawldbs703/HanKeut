@@ -3,6 +3,7 @@
 import "server-only";
 
 export interface AiConfig {
+  provider: "tilon" | "llm";
   baseUrl: string;
   apiKey?: string;
   model: string;
@@ -15,18 +16,23 @@ export interface ChatMessage {
 
 export class AiError extends Error {}
 
-/** 환경변수에서 틸론 설정을 읽어요. 주소나 모델이 없으면 null(=데모 모드)이에요. */
+/** 환경변수에서 LLM 설정을 읽어요. 주소나 모델이 없으면 null(=AI 미연결)이에요. */
 export function getAiConfig(): AiConfig | null {
-  const baseUrl = process.env.TILON_API_BASE_URL?.trim();
-  const model = process.env.TILON_MODEL?.trim();
-  if (!baseUrl || !model) return null;
-  return { baseUrl: baseUrl.replace(/\/+$/, ""), apiKey: process.env.TILON_API_KEY?.trim(), model };
+  const env = (k: string) => process.env[k]?.trim() || undefined;
+  const clean = (u: string) => u.replace(/\/+$/, "");
+  // 1순위: 교내 GPU(틸론)
+  const tBase = env("TILON_API_BASE_URL"), tModel = env("TILON_MODEL");
+  if (tBase && tModel) return { provider: "tilon", baseUrl: clean(tBase), apiKey: env("TILON_API_KEY"), model: tModel };
+  // 2순위: 그 밖의 OpenAI 호환 LLM API (예: Vercel AI Gateway, OpenAI)
+  const lBase = env("LLM_API_BASE_URL"), lModel = env("LLM_MODEL");
+  if (lBase && lModel) return { provider: "llm", baseUrl: clean(lBase), apiKey: env("LLM_API_KEY"), model: lModel };
+  return null;
 }
 
 export async function chatCompletion(
   config: AiConfig,
   messages: ChatMessage[],
-  options: { temperature?: number; maxTokens?: number; timeoutMs?: number } = {}
+  options: { temperature?: number; maxTokens?: number; timeoutMs?: number; frequencyPenalty?: number } = {}
 ): Promise<string> {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (config.apiKey) headers.Authorization = `Bearer ${config.apiKey}`;
@@ -41,6 +47,7 @@ export async function chatCompletion(
         messages,
         temperature: options.temperature ?? 0.7,
         max_tokens: options.maxTokens ?? 600,
+        ...(options.frequencyPenalty !== undefined && { frequency_penalty: options.frequencyPenalty }),
       }),
       signal: AbortSignal.timeout(options.timeoutMs ?? 30_000),
     });

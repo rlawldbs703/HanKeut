@@ -5,7 +5,8 @@ import type { TiniAccessory, TiniBodyShape } from "@/lib/tini/catalog";
 export type Category = "school" | "work" | "friend" | "love";
 
 /** AI 응답을 누가 만들었는지: 틸론 GPU 모델 또는 데모(규칙 기반) */
-export type AiSource = "tilon" | "demo";
+/** 응답 출처: 틸론 GPU / 다른 LLM API / 미연결(임시 로직) */
+export type AiSource = "tilon" | "llm" | "demo";
 
 /** 대결 상대 캐릭터 */
 export interface Character {

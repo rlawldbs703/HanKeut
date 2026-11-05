@@ -297,6 +297,15 @@ function TiniChat({ profile, onEdit }: { profile: TiniProfile; onEdit: () => voi
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages.length, loading]);
 
+  // AI 연결 상태 확인 (미연결이면 입력을 막고 안내)
+  useEffect(() => {
+    fetch("/api/health")
+      .then((r) => r.json())
+      .then((d: { source: AiSource }) => setSource(d.source))
+      .catch(() => setSource("demo"));
+  }, []);
+  const offline = source === "demo";
+
   async function send() {
     const content = input.trim();
     if (!content || loading) return;
@@ -314,7 +323,15 @@ function TiniChat({ profile, onEdit }: { profile: TiniProfile; onEdit: () => voi
         }),
       });
       if (!res.ok) throw new Error();
-      const data = (await res.json()) as { reply: string; source: AiSource };
+      const data = (await res.json()) as { reply: string | null; source: AiSource; fallbackReason?: string };
+      if (!data.reply) {
+        // 실제 AI 답이 없으면 꾸며 내지 않고 안내만
+        setSource(data.source);
+        toast.info(data.fallbackReason ?? "AI 응답이 없어요.");
+        setMessages(messages);
+        setInput(content);
+        return;
+      }
       const withReply: TiniMessage[] = [...next, { role: "tini", content: data.reply }];
       setMessages(withReply);
       setSource(data.source);
@@ -344,9 +361,10 @@ function TiniChat({ profile, onEdit }: { profile: TiniProfile; onEdit: () => voi
           <div className="flex-1">
             <p className="text-lg font-black">{profile.name}</p>
             <p className="text-xs text-muted-foreground">
-              답을 대신 써 주지 않아요. 내 생각을 정리하도록 도와줘요.
-              {source === "demo" && " · 🧪 체험 모드(임시 응답)"}
+              일상 이야기부터 고민까지, 편하게 말 걸어 주세요.
               {source === "tilon" && " · 🟢 틸론 GPU"}
+              {source === "llm" && " · 🟢 AI 연결됨"}
+              {offline && " · ⚪ AI 미연결"}
             </p>
           </div>
           <Button variant="outline" size="sm" onClick={onEdit}>
@@ -356,8 +374,13 @@ function TiniChat({ profile, onEdit }: { profile: TiniProfile; onEdit: () => voi
       </Card>
 
       <div className="space-y-3">
-        {messages.length === 0 && (
-          <p className="py-6 text-center text-sm text-muted-foreground">{profile.name}에게 요즘 고민을 털어놓아 보세요.</p>
+        {offline && (
+          <p className="rounded-xl border border-dashed bg-secondary/60 p-4 text-sm">
+            ⚪ 지금은 AI(LLM)가 연결되어 있지 않아 대화할 수 없어요. 정해진 답을 꾸며 보여 주지 않아요. 관리자가 <code>.env.local</code>에 LLM 정보를 넣으면 바로 대화할 수 있어요.
+          </p>
+        )}
+        {messages.length === 0 && !offline && (
+          <p className="py-6 text-center text-sm text-muted-foreground">{profile.name}에게 오늘 있었던 일이나 요즘 고민을 이야기해 보세요.</p>
         )}
         {messages.map((m, i) =>
           m.role === "tini" ? (
@@ -389,7 +412,7 @@ function TiniChat({ profile, onEdit }: { profile: TiniProfile; onEdit: () => voi
             value={input}
             rows={2}
             maxLength={1000}
-            placeholder="고민을 적어 보세요. (Enter 전송)"
+            placeholder="무엇이든 이야기해 보세요. (Enter 전송)"
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
@@ -397,9 +420,9 @@ function TiniChat({ profile, onEdit }: { profile: TiniProfile; onEdit: () => voi
                 send();
               }
             }}
-            disabled={loading}
+            disabled={loading || offline}
           />
-          <Button onClick={send} disabled={loading || !input.trim()} aria-label="보내기">
+          <Button onClick={send} disabled={loading || offline || !input.trim()} aria-label="보내기">
             <Send />
           </Button>
         </CardContent>

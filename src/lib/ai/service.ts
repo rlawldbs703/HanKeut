@@ -13,7 +13,7 @@ import type {
   TurnResult,
 } from "@/types";
 import { type AiConfig, type ChatMessage, chatCompletion, getAiConfig } from "./client";
-import { demoEvaluate, demoScenario, demoTini, demoTurn } from "./demo";
+import { demoEvaluate, demoScenario, demoTurn } from "./demo";
 import { evaluationSchema, extractJson, generatedScenarioSchema, turnResultSchema } from "./parse";
 import {
   type Focus,
@@ -56,7 +56,7 @@ export async function withFallback<T>(
   const config = getAiConfig();
   if (!config) return { ...demo(), source: "demo", fallbackReason: "틸론 API가 설정되지 않았어요." };
   try {
-    return { ...(await run(config)), source: "tilon" };
+    return { ...(await run(config)), source: config.provider };
   } catch (e) {
     console.error("[AI] 틸론 호출 실패, 데모 모드로 대체:", (e as Error).message);
     return { ...demo(), source: "demo", fallbackReason: "틸론 응답에 실패해 데모 모드로 답했어요." };
@@ -110,21 +110,28 @@ export async function runScenarioGeneration(input: {
   );
 }
 
-export function runTiniChat(input: {
+/** 미니띠니 대화: 실제 LLM이 없으면 정해진 답을 꾸며 내지 않고 미연결이라고 알려요. */
+export async function runTiniChat(input: {
   profile: TiniPersona;
   messages: TiniMessage[];
-}): Promise<WithSource<{ reply: string }>> {
-  const last = input.messages.at(-1)?.content ?? "";
-  return withFallback(
-    async (c) => ({
-      reply: (await chatCompletion(c, buildTiniMessages(input.profile, input.messages), { temperature: 0.8 })).trim(),
-    }),
-    () => ({ reply: demoTini(input.profile, last) })
-  );
+}): Promise<WithSource<{ reply: string | null }>> {
+  const config = getAiConfig();
+  if (!config) return { reply: null, source: "demo", fallbackReason: "AI가 연결되지 않아 지금은 대화할 수 없어요." };
+  try {
+    const text = await chatCompletion(config, buildTiniMessages(input.profile, input.messages), {
+      temperature: 0.9,
+      maxTokens: 500,
+      frequencyPenalty: 0.6, // 같은 표현 반복 줄이기
+    });
+    return { reply: text.trim(), source: config.provider };
+  } catch (e) {
+    console.error("[AI] 미니띠니 응답 실패:", (e as Error).message);
+    return { reply: null, source: "demo", fallbackReason: "AI 응답에 실패했어요. 잠시 후 다시 보내 주세요." };
+  }
 }
 
 /** 화면 상단에 보여 줄 AI 연결 상태 (키는 절대 포함하지 않아요) */
 export function getAiStatus(): { source: AiSource; model?: string } {
   const c = getAiConfig();
-  return c ? { source: "tilon", model: c.model } : { source: "demo" };
+  return c ? { source: c.provider, model: c.model } : { source: "demo" };
 }

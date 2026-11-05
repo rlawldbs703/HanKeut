@@ -48,3 +48,15 @@ export const saveTiniChat = (m: TiniMessage[]) => write(KEYS.tiniChat, m.slice(-
 const CREATION_KEY = "hankeut:creation";
 export const saveCreation = (text: string) => write(CREATION_KEY, text.slice(0, 160));
 export const loadCreation = () => read<string | null>(CREATION_KEY, null);
+
+// 별의 끝에서: 미래의 나에게 보내는 타임캡슐
+export interface Capsule {
+  id: string;
+  createdAt: string;
+  openAt: string; // YYYY-MM-DD
+  entries: { q: string; a: string }[];
+  letterExcerpt?: string;
+}
+const CAPSULE_KEY = "hankeut:capsules";
+export const loadCapsules = () => read<Capsule[]>(CAPSULE_KEY, []);
+export const saveCapsule = (c: Capsule) => write(CAPSULE_KEY, [...loadCapsules(), c].slice(-50));

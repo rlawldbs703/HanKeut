@@ -5,10 +5,8 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 
 const NAV = [
-  { href: "/create", label: "공동창작", short: "창작" },
-  { href: "/battle", label: "한끗대결", short: "대결" },
-  { href: "/tini", label: "MINI-TTINI", short: "티니" },
-  { href: "/growth", label: "MY GROWTH", short: "성장" },
+  { href: "/play", label: "별의 끝에서", short: "별의 끝에서" },
+  { href: "/tini", label: "미니띠니", short: "미니띠니" },
 ];
 
 export function NavLinks() {

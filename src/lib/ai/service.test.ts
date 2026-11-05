@@ -59,7 +59,8 @@ describe("틸론 미설정 → 데모 모드", () => {
       profile: { name: "티니", personality: "warm", speechStyle: "casual" },
       messages: [{ role: "user", content: "친구랑 싸웠어" }],
     });
-    expect(tini.reply).toContain("친구랑 싸웠어");
+    expect(tini.reply).toBeNull(); // LLM 없으면 꾸며 낸 답을 주지 않음
+    expect(tini.fallbackReason).toBeTruthy();
   });
 });
 

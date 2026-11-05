@@ -63,6 +63,8 @@ describe("API 라우트 (데모 모드)", () => {
         messages: [{ role: "user", content: "발표가 걱정돼요" }],
       })
     );
-    expect((await res.json()).reply).toBeTruthy();
+    const d = await res.json();
+    expect(d.reply).toBeNull();
+    expect(d.source).toBe("demo");
   });
 });
