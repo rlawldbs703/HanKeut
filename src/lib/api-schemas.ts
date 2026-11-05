@@ -51,10 +51,9 @@ export const generateRequest = z.object({
 });
 
 export const tiniRequest = z.object({
+  // 꾸미기(avatar)는 화면에서만 쓰므로 서버는 이름·성격·말투만 확인해요.
   profile: z.object({
     name: text(20),
-    emoji: text(16),
-    color: text(20),
     personality: z.enum(["warm", "realistic", "cheerful"]),
     speechStyle: z.enum(["casual", "polite"]),
   }),

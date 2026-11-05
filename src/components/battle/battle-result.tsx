@@ -73,7 +73,7 @@ export function BattleResult({
 
       {!evaluation && !failed && (
         <p className="flex items-center justify-center gap-2 py-6 text-sm text-muted-foreground">
-          <Loader2 className="size-4 animate-spin" /> AI가 대화를 분석하고 있어요…
+          <Loader2 className="size-4 animate-spin" /> 대화를 분석하고 있어요…
         </p>
       )}
       {failed && <p className="py-4 text-center text-sm text-destructive">평가를 불러오지 못했어요.</p>}
@@ -102,7 +102,7 @@ export function BattleResult({
                 <p className="rounded-lg bg-amber-50 p-3">🔧 {evaluation.feedback.improvements}</p>
               </div>
               <p className="text-right text-xs text-muted-foreground">
-                평가: {evaluation.source === "tilon" ? "🟢 틸론 GPU 모델" : "🟡 데모 모드(규칙 기반)"}
+                평가: {evaluation.source === "tilon" ? "🟢 틸론 GPU 모델" : "🧪 체험 모드(임시 평가 로직)"}
               </p>
             </CardContent>
           </Card>

@@ -2,7 +2,7 @@
 // 실제 AI가 아니므로 화면에 항상 "데모 모드"라고 표시해요.
 import { SCENARIOS } from "@/data/scenarios";
 import { clamp, normalizeDelta } from "@/lib/game/engine";
-import type { Category, ChatTurn, Evaluation, Scenario, TiniProfile, TurnResult } from "@/types";
+import type { Category, ChatTurn, Evaluation, Scenario, TiniPersona, TurnResult } from "@/types";
 
 const RULES = [
   { re: /죄송|미안|사과/, delta: 6, label: "사과" },
@@ -83,7 +83,7 @@ export function demoScenario(category: Category): Omit<Scenario, "id"> {
   return { ...pick, title: `${pick.title} (데모 변형)` };
 }
 
-export function demoTini(profile: TiniProfile, lastMessage: string): string {
+export function demoTini(profile: TiniPersona, lastMessage: string): string {
   const casual = profile.speechStyle === "casual";
   const topic = lastMessage.length > 20 ? `${lastMessage.slice(0, 20)}…` : lastMessage;
   return casual

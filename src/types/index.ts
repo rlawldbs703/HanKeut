@@ -1,4 +1,5 @@
 // 한끗차이에서 쓰는 데이터 모양을 한곳에 모아 둔 파일이에요.
+import type { TiniAccessory, TiniBodyShape } from "@/lib/tini/catalog";
 
 /** 대화 상황 카테고리 */
 export type Category = "school" | "work" | "friend" | "love";
@@ -84,16 +85,26 @@ export interface BattleRecord {
   aiSource: AiSource;
 }
 
+/** MINI-TTINI 먼지 캐릭터 꾸미기 설정 */
+export interface TiniAvatar {
+  body: TiniBodyShape;
+  bodyColor: string;
+  accessories: TiniAccessory[];
+  accessoryColors: Record<TiniAccessory, string>;
+}
+
 /** MY MINI-TTINI 프로필 */
 export interface TiniProfile {
   name: string;
-  emoji: string;
-  color: string;
   personality: "warm" | "realistic" | "cheerful";
   speechStyle: "casual" | "polite";
+  avatar: TiniAvatar;
 }
 
 export interface TiniMessage {
   role: "user" | "tini";
   content: string;
 }
+
+/** 상담에 필요한 티니 정보 (꾸미기 제외) */
+export type TiniPersona = Pick<TiniProfile, "name" | "personality" | "speechStyle">;

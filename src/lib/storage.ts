@@ -1,6 +1,7 @@
 // 브라우저(localStorage)에 기록을 저장해요. 로그인 없이 쓰는 MVP용이에요.
 "use client";
 
+import { normalizeProfile } from "@/lib/tini/profile";
 import type { BattleRecord, Scenario, TiniMessage, TiniProfile } from "@/types";
 
 const KEYS = {
@@ -37,7 +38,8 @@ export function saveAiScenario(scenario: Scenario) {
 }
 export const loadAiScenario = (id: string) => read<Record<string, Scenario>>(KEYS.scenarios, {})[id];
 
-export const loadTiniProfile = () => read<TiniProfile | null>(KEYS.tini, null);
+// 예전 형식으로 저장된 값도 normalizeProfile이 새 형식으로 바꿔 줘요.
+export const loadTiniProfile = (): TiniProfile | null => normalizeProfile(read<unknown>(KEYS.tini, null));
 export const saveTiniProfile = (p: TiniProfile) => write(KEYS.tini, p);
 export const loadTiniChat = () => read<TiniMessage[]>(KEYS.tiniChat, []);
 export const saveTiniChat = (m: TiniMessage[]) => write(KEYS.tiniChat, m.slice(-50));

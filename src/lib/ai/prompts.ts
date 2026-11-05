@@ -1,7 +1,7 @@
 // AI에게 보내는 지시문(프롬프트)을 만드는 곳이에요. 말투나 평가 기준을 바꾸고 싶으면 여기만 고치면 돼요.
 import { CATEGORY_LABELS } from "@/data/scenarios";
 import { DELTA_MAX, DELTA_MIN } from "@/lib/game/engine";
-import type { Category, ChatTurn, Scenario, TiniMessage, TiniProfile } from "@/types";
+import type { Category, ChatTurn, Scenario, TiniMessage, TiniPersona, TiniProfile } from "@/types";
 import type { ChatMessage } from "./client";
 
 const COMPETENCIES = `- 논리력: 이유와 근거, 구체적인 해결책이 있는가
@@ -105,9 +105,9 @@ const PERSONALITY_TEXT: Record<TiniProfile["personality"], string> = {
 };
 
 /** MY MINI-TTINI 고민 상담 */
-export function buildTiniMessages(profile: TiniProfile, messages: TiniMessage[]): ChatMessage[] {
+export function buildTiniMessages(profile: TiniPersona, messages: TiniMessage[]): ChatMessage[] {
   const style = profile.speechStyle === "casual" ? "친구처럼 반말" : "부드러운 존댓말";
-  const system = `너는 사용자가 직접 만든 AI 친구 '${profile.name}'(${profile.emoji})다.
+  const system = `너는 사용자가 직접 꾸민 몽글몽글한 먼지 친구 '${profile.name}'다.
 성격: ${PERSONALITY_TEXT[profile.personality]}. 말투: ${style}.
 역할: 사용자의 고민을 들어 주는 친구.
 원칙:

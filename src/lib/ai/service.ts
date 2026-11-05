@@ -9,7 +9,7 @@ import type {
   Evaluation,
   Scenario,
   TiniMessage,
-  TiniProfile,
+  TiniPersona,
   TurnResult,
 } from "@/types";
 import { type AiConfig, type ChatMessage, chatCompletion, getAiConfig } from "./client";
@@ -111,7 +111,7 @@ export async function runScenarioGeneration(input: {
 }
 
 export function runTiniChat(input: {
-  profile: TiniProfile;
+  profile: TiniPersona;
   messages: TiniMessage[];
 }): Promise<WithSource<{ reply: string }>> {
   const last = input.messages.at(-1)?.content ?? "";

@@ -104,7 +104,7 @@ function BattleGame({ scenario }: { scenario: Scenario }) {
               <div className="flex flex-wrap items-center gap-2">
                 <h1 className="font-bold">{scenario.title}</h1>
                 <Badge variant="outline">{CATEGORY_LABELS[scenario.category]}</Badge>
-                {scenario.isAiGenerated && <Badge>✨ AI 생성</Badge>}
+                {scenario.isAiGenerated && <Badge>✨ 맞춤 생성</Badge>}
               </div>
               <p className="text-sm text-muted-foreground">{scenario.situation}</p>
               <p className="text-sm">
@@ -119,7 +119,7 @@ function BattleGame({ scenario }: { scenario: Scenario }) {
             </span>
             <span>
               남은 턴 <b className="text-foreground">{turnsLeft(state, scenario)}</b> / {scenario.maxTurns}
-              {source && (source === "tilon" ? " · 🟢 틸론 GPU" : " · 🟡 데모")}
+              {source && (source === "tilon" ? " · 🟢 틸론 GPU" : " · 🧪 체험 모드")}
             </span>
           </div>
         </CardContent>

@@ -59,7 +59,7 @@ describe("API 라우트 (데모 모드)", () => {
   it("POST /api/tini/chat", async () => {
     const res = await tini(
       post({
-        profile: { name: "티니", emoji: "🐣", color: "pink", personality: "warm", speechStyle: "polite" },
+        profile: { name: "티니", personality: "warm", speechStyle: "polite" },
         messages: [{ role: "user", content: "발표가 걱정돼요" }],
       })
     );

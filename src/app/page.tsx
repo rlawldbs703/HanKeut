@@ -14,7 +14,7 @@ const FEATURES = [
     href: "/tini",
     emoji: "🐣",
     title: "MY MINI-TTINI",
-    desc: "직접 꾸민 AI 친구에게 고민을 털어놓아요. 답을 대신 써 주지 않고, 스스로 생각하도록 도와줘요.",
+    desc: "직접 꾸민 몽글몽글 먼지 친구에게 고민을 털어놓아요. 답을 대신 써 주지 않고, 스스로 생각하도록 도와줘요.",
   },
   {
     href: "/growth",

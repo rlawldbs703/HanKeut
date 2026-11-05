@@ -56,7 +56,7 @@ describe("틸론 미설정 → 데모 모드", () => {
     expect(gen.scenario.category).toBe("love");
 
     const tini = await runTiniChat({
-      profile: { name: "티니", emoji: "🐣", color: "#f9a8d4", personality: "warm", speechStyle: "casual" },
+      profile: { name: "티니", personality: "warm", speechStyle: "casual" },
       messages: [{ role: "user", content: "친구랑 싸웠어" }],
     });
     expect(tini.reply).toContain("친구랑 싸웠어");
