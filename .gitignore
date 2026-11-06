@@ -49,3 +49,6 @@ Thumbs.db
 
 # local tool settings
 .claude/settings.local.json
+
+.vercel
+.env*
