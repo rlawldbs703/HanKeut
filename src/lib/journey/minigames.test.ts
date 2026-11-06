@@ -1,12 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { FIRST_QUESTION, HINTS, REGIONS } from "./regions";
+import { FIRST_QUESTION, POOLS, REGIONS } from "./regions";
 import { SHADOW_START, checkOrder, moveInShadow, shadowAt } from "./minigames";
 
 describe("지역 구성", () => {
   it("5개 지역, 관문마다 서로 다른 미니게임", () => {
     expect(REGIONS.map((r) => r.name)).toEqual(["별의 집", "잊혀진 정원", "그림자 평원", "시간의 다락", "별의 전당"]);
     expect(new Set(REGIONS.map((r) => r.gate.minigame)).size).toBe(5);
-    expect(Object.keys(HINTS)).toHaveLength(4);
+    expect(Object.keys(POOLS)).toEqual(REGIONS.map((r) => r.id));
+    // 기획서의 25개 질문 = 지역별 첫 물음 10개 + 질문 풀 15개
+    expect(REGIONS.flatMap((r) => r.spots).length + Object.values(POOLS).flat().length).toBe(25);
     expect(FIRST_QUESTION).toContain("나는 누구였을까");
   });
 

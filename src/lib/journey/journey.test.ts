@@ -49,7 +49,7 @@ describe("LLM 연결 시", () => {
     expect(d).toMatchObject({ source: "llm", followUp: "그 사진을 볼 때 마음은 어디에 가 있을까?" });
     const sent = JSON.parse(fetchMock.mock.calls[0][1].body).messages;
     expect(sent[1].content).toContain("할머니 집 다락방");
-    expect(sent[0].content).toContain("나다워질까"); // 지역 힌트 전달
+    expect(sent[0].content).toContain("제약이 없다면"); // 지역 질문 풀 전달
   });
 
   it("LLM 실패 시 502 + 재시도 안내", async () => {
@@ -82,5 +82,16 @@ describe("예비 모델", () => {
     const d = await (await reply(post(req))).json();
     expect(d.reply).toBe("예비 모델 응답");
     expect(JSON.parse(fetchMock.mock.calls[1][1].body).model).toBe("backup");
+  });
+});
+
+describe("짧은 답", () => {
+  it("한두 단어 답은 모델이 후속 질문을 줘도 null로 막는다", async () => {
+    vi.stubEnv("TILON_API_BASE_URL", "");
+    vi.stubEnv("LLM_API_BASE_URL", "https://llm.example/v1");
+    vi.stubEnv("LLM_MODEL", "m");
+    vi.stubGlobal("fetch", llm('{"reply":"게임 좋지.","followUp":"어떤 게임?"}'));
+    const d = await (await reply(post({ ...req, answer: "게임" }))).json();
+    expect(d.followUp).toBeNull();
   });
 });

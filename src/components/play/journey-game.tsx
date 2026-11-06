@@ -221,6 +221,16 @@ export function JourneyGame() {
     }
   }
 
+  /** 답하고 싶지 않은 물음은 건너뛰기 (기록하지 않음) */
+  function skipQuestion() {
+    if (!talk?.ask) return;
+    const spot = region.spots.find((s) => s.id === talk.ask!.spotId) ?? null;
+    setAnswer("");
+    setAiError(null);
+    setTalk(null);
+    finishSpot(spot);
+  }
+
   // 월드 오브젝트
   const objects = [
     ...region.spots.filter((s) => !doneSpots.includes(s.id)).map((s) => ({ id: s.id, kind: "spot" as const, x: s.x, lane: s.lane, label: s.label, spot: s })),
@@ -329,7 +339,7 @@ export function JourneyGame() {
   const laneScale = (l: number) => 1 - l * 0.35;
   const motion = view.speed > 300 ? "anim-run" : view.speed > 25 ? "anim-walk" : "anim-breathe";
   const memoryCards = REGIONS.slice(0, 4).map((r, i) => ({
-    label: ["어린 시절", "지금의 나", "마음", "미래"][i],
+    label: ["어린 시절", "좋아하는 것", "편안한 순간", "지금과 미래"][i],
     text: history.find((h) => h.region === r.name)?.answer ?? "(흐릿한 기억)",
   }));
   const hold = (k: string) => ({
@@ -439,9 +449,10 @@ export function JourneyGame() {
                   <div className="flex items-end gap-2">
                     <textarea ref={inputRef} value={answer} onChange={(e) => setAnswer(e.target.value)} rows={2} maxLength={1000} disabled={waiting} aria-label="나의 대답"
                       onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); submitAnswer(); } }}
-                      placeholder="떠오르는 대로 자유롭게. 짧아도 괜찮아. (Enter)"
+                      placeholder="떠오르는 대로 자유롭게. 짧아도, 건너뛰어도 괜찮아. (Enter)"
                       className="min-h-12 flex-1 resize-none rounded-lg bg-white/10 p-2 text-sm text-white outline-none ring-1 ring-white/20 placeholder:text-indigo-300 focus:ring-amber-200/60" />
                     <Button size="icon-lg" onClick={() => submitAnswer()} disabled={waiting} aria-label="대답 보내기">{waiting ? <Loader2 className="animate-spin" /> : <Send />}</Button>
+                    <Button size="sm" variant="ghost" className="text-indigo-200" onClick={skipQuestion} disabled={waiting}>건너뛰기</Button>
                   </div>
                 )}
               </div>
