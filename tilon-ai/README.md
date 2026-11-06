@@ -17,7 +17,8 @@
 |---|---|
 | `outputs/generation_log.json` | 모델·경로, GPU 이름·메모리, CUDA·torch 버전, 프롬프트, 시드, 장당 생성 시간, 최대 GPU 메모리, nvidia-smi |
 | `outputs/web/*.webp` | 웹용 이미지 (1600×900) |
-| `outputs/*.png` | 원본 (896×512, 저장소에는 올리지 않음) |
+| `outputs/summary.png` | 결과 요약 이미지 (GPU 정보 + 6장, 발표·증빙용) |
+| `outputs/*.png` | 원본 (896×512) |
 
 ## 사이트 반영 위치
 | 이미지 | 위치 |
