@@ -26,7 +26,9 @@
 | title | 게임 타이틀 화면, 홈 화면 ‘별의 끝에서’ 카드 |
 | house / garden / plain / attic / hall | 게임 각 지역 배경 (별의 집 / 잊혀진 정원 / 그림자 평원 / 시간의 다락 / 별의 전당) |
 
-등록 위치: `src/data/generated-images.ts`
+| 그림 로고 `public/generated/logo-mark.png` | 홈페이지 헤더 왼쪽 상단 (글자 로고 옆) — [데스크톱](../docs/screenshots/header-logo-desktop.png) · [모바일](../docs/screenshots/header-logo-mobile.png) |
+
+등록 위치: `src/data/generated-images.ts` (배경), `src/components/layout/site-header.tsx` (그림 로고)
 
 ## GPU 사용 기록
 > 틸론에서 노트북을 실제로 실행한 뒤 기록합니다. (아직 실행 전)
