@@ -53,3 +53,4 @@ Thumbs.db
 # 틸론 이미지 생성: 원본 PNG·압축파일은 용량이 커서 제외 (웹용 WebP와 기록만 저장)
 /tilon-ai/outputs/raw/
 /tilon-ai/*.zip
+/tilon-ai/workshop.ipynb
