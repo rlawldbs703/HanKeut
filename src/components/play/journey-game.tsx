@@ -5,6 +5,7 @@ import { Loader2, Maximize, RotateCcw, Send, Volume2, VolumeX } from "lucide-rea
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { GENERATED_BG, type GeneratedKey } from "@/data/generated-images";
 import { FIRST_QUESTION, REGIONS, type Spot, type Theme } from "@/lib/journey/regions";
 import type { Exchange, LetterResult } from "@/lib/journey/types";
 import { saveJourneyLog } from "@/lib/storage";
@@ -335,6 +336,7 @@ export function JourneyGame() {
   });
   useEffect(() => () => stopAmbient(), []);
 
+  const regionBg = GENERATED_BG[region.id as GeneratedKey];
   const laneBottom = (l: number) => `${10 + l * 24}%`;
   const laneScale = (l: number) => 1 - l * 0.35;
   const motion = view.speed > 300 ? "anim-run" : view.speed > 25 ? "anim-walk" : "anim-breathe";
@@ -354,9 +356,14 @@ export function JourneyGame() {
         className="relative aspect-[16/10] w-full touch-none select-none overflow-hidden rounded-2xl bg-indigo-950 shadow-2xl ring-1 ring-indigo-900/40 sm:aspect-video">
         {phase !== "title" && <div key={region.id} className="animate-out fade-out fill-mode-forwards pointer-events-none absolute inset-0 z-[35] bg-black duration-1000" />}
 
-        <div className="absolute inset-0" style={{ filter: FILTER[region.theme] }}>
+        <div className="absolute inset-0" style={{ filter: regionBg ? "none" : FILTER[region.theme] }}>
           <div className="absolute inset-0 transition-[filter] duration-1000" style={{ filter: `brightness(${0.72 + hope * 0.35})` }}>
             <Sky stage={stage} hope={hope} />
+            {/* 틸론 GPU 생성 배경 (등록된 경우에만) */}
+            {regionBg && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={regionBg} alt="" aria-hidden className="absolute inset-0 h-full w-[115%] max-w-none object-cover" style={{ transform: `translate3d(${-view.cam * 0.12}px,0,0)` }} />
+            )}
           </div>
           <StarField hope={hope} />
           <div className="absolute inset-0 will-change-transform" style={{ transform: `translate3d(${-view.cam * 0.55}px,0,0)` }}>
@@ -521,7 +528,7 @@ export function JourneyGame() {
         )}
 
         {phase === "title" && (
-          <div className="absolute inset-0 z-50 flex flex-col items-center justify-center gap-4 bg-indigo-950/40 text-center text-amber-50">
+          <div className="absolute inset-0 z-50 flex flex-col items-center justify-center gap-4 bg-indigo-950/40 bg-cover bg-center text-center text-amber-50" style={GENERATED_BG.title ? { backgroundImage: `linear-gradient(rgba(30,27,75,.35),rgba(30,27,75,.55)), url(${GENERATED_BG.title})` } : undefined}>
             <p className="text-xs tracking-[0.3em] text-amber-200">AT THE END OF STARS</p>
             <h2 className="text-3xl font-black sm:text-4xl" style={{ textShadow: "0 0 20px #fde68a" }}>별의 끝에서</h2>
             <p className="max-w-sm text-sm text-indigo-100">기억을 잃은 별의 아이가 되어, 별빛 세계에서 나를 다시 찾아가는 여행.</p>

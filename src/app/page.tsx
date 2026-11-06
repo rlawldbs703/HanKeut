@@ -2,6 +2,7 @@ import Link from "next/link";
 import { HankeutLogo } from "@/components/brand/hankeut-logo";
 import { TiniCharacter } from "@/components/tini/tini-character";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { GENERATED_BG } from "@/data/generated-images";
 import { DEFAULT_AVATAR } from "@/lib/tini/profile";
 
 export default function HomePage() {
@@ -18,7 +19,7 @@ export default function HomePage() {
       <section className="grid gap-4 sm:grid-cols-2">
         <Link href="/play" className="group">
           <Card className="h-full overflow-hidden transition group-hover:ring-2 group-hover:ring-accent">
-            <div className="flex h-36 items-center justify-center bg-gradient-to-b from-indigo-950 via-violet-900 to-amber-200/60 text-5xl text-amber-100" style={{ textShadow: "0 0 24px #fde68a" }}>
+            <div className="flex h-36 items-center justify-center bg-gradient-to-b from-indigo-950 via-violet-900 to-amber-200/60 bg-cover bg-center text-5xl text-amber-100" style={{ textShadow: "0 0 24px #fde68a", ...(GENERATED_BG.title && { backgroundImage: `url(${GENERATED_BG.title})` }) }}>
               ✦
             </div>
             <CardHeader>
