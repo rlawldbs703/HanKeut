@@ -1,0 +1,3 @@
+#!/bin/sh
+# 커밋 전에 API 키·.env 파일이 섞였는지 자동 검사 (막히면 커밋 취소)
+node scripts/check-secrets.mjs --staged

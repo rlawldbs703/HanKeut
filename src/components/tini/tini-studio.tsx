@@ -361,7 +361,7 @@ function TiniChat({ profile, onEdit }: { profile: TiniProfile; onEdit: () => voi
           <div className="flex-1">
             <p className="text-lg font-black">{profile.name}</p>
             <p className="text-xs text-muted-foreground">
-              일상 이야기부터 고민까지, 편하게 말 걸어 주세요.
+              일상 이야기부터 고민까지, 편하게 말 걸어 주세요. (대화는 AI 서비스로 전송돼요. 민감한 개인정보는 적지 마세요)
               {source === "tilon" && " · 🟢 틸론 GPU"}
               {source === "llm" && " · 🟢 AI 연결됨"}
               {offline && " · ⚪ AI 미연결"}

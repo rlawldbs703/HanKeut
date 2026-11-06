@@ -538,6 +538,7 @@ export function JourneyGame() {
                 <li><b className="rounded bg-white/15 px-2 py-0.5">마우스</b> 편지 확인 · 상호작용</li>
               </ul>
               <p className="text-xs text-indigo-200">떠오르는 물음에는 자유롭게 글로 답해 줘. 정답은 없어.</p>
+              <p className="text-[11px] text-indigo-300">🔒 답변은 대화와 편지를 만들기 위해 AI 서비스로 전송되고, 기록은 이 브라우저에만 저장돼요. 이름·연락처 같은 민감한 개인정보는 적지 마세요.</p>
               <Button onClick={beginJourney}>여행 시작 (SPACE)</Button>
             </div>
           </div>
