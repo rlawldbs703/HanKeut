@@ -82,5 +82,5 @@ export function runLetter(history: Exchange[]) {
     },
     { role: "user", content: log(history) },
   ];
-  return call((c) => askJson(c, messages, letterResultSchema, 0.8));
+  return call((c) => askJson(c, messages, letterResultSchema, 0.8, 4000));
 }

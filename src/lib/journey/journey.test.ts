@@ -67,3 +67,20 @@ describe("LLM 연결 시", () => {
     expect(d.source).toBe("llm");
   });
 });
+
+describe("예비 모델", () => {
+  it("기본 모델이 429면 다음 모델로 응답한다", async () => {
+    vi.stubEnv("TILON_API_BASE_URL", "");
+    vi.stubEnv("LLM_API_BASE_URL", "https://llm.example/v1");
+    vi.stubEnv("LLM_MODEL", "main");
+    vi.stubEnv("LLM_FALLBACK_MODELS", "backup");
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response("quota", { status: 429 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ choices: [{ message: { content: '{"reply":"예비 모델 응답","followUp":null}' } }] })));
+    vi.stubGlobal("fetch", fetchMock);
+    const d = await (await reply(post(req))).json();
+    expect(d.reply).toBe("예비 모델 응답");
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body).model).toBe("backup");
+  });
+});

@@ -30,11 +30,12 @@ export async function askJson<S extends z.ZodTypeAny>(
   config: AiConfig,
   messages: ChatMessage[],
   schema: S,
-  temperature: number
+  temperature: number,
+  maxTokens = 1200
 ): Promise<z.output<S>> {
   let lastError: unknown;
   for (let attempt = 0; attempt < 2; attempt++) {
-    const text = await chatCompletion(config, messages, { temperature });
+    const text = await chatCompletion(config, messages, { temperature, maxTokens, json: true });
     try {
       return schema.parse(extractJson(text));
     } catch (e) {
@@ -120,8 +121,7 @@ export async function runTiniChat(input: {
   try {
     const text = await chatCompletion(config, buildTiniMessages(input.profile, input.messages), {
       temperature: 0.9,
-      maxTokens: 500,
-      frequencyPenalty: 0.6, // 같은 표현 반복 줄이기
+      maxTokens: 1000,
     });
     return { reply: text.trim(), source: config.provider };
   } catch (e) {
