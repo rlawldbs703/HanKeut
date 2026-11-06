@@ -36,3 +36,16 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# test / tool outputs
+/test-results/
+/playwright-report/
+/blob-report/
+*.log
+
+# OS / editor
+Thumbs.db
+.idea/
+
+# local tool settings
+.claude/settings.local.json
